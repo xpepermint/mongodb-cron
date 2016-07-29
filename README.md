@@ -1,3 +1,5 @@
+![Build Status](https://travis-ci.org/xpepermint/mongodb-cron.svg?branch=master)&nbsp;[![NPM Version](https://badge.fury.io/js/mongodb-cron.svg)](https://badge.fury.io/js/mongodb-cron)&nbsp;[![Dependency Status](https://gemnasium.com/xpepermint/mongodb-cron.svg)](https://gemnasium.com/xpepermint/mongodb-cron)
+
 # [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/)-cron
 
 > MongoDB collection as crontab
@@ -150,7 +152,7 @@ let cron = new MongoCron({
   onDocument: async (doc, cron) => {},
   // A method which is triggered in case of an error.
   onError: async (err, cron) => {},
-  
+
   // (default=0) A variable which tells how fast the next job can be processed.
   nextDelay: 1000,
   // (default=0) A variable which tells how many milliseconds the worker should 
