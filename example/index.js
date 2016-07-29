@@ -7,10 +7,15 @@ MongoClient.connect('mongodb://localhost:27017/test').then((db) => {
 
   const cron = new MongoCron({
     collection,
-    onDocument: (doc, cron) => {
-      console.log('onDocument', doc);
-      return sleep(30000);
-    },
+    enabledFieldPath: 'cron.enabled',
+    waitUntilFieldPath: 'cron.waitUntil',
+    expireAtFieldPath: 'cron.waitUntil',
+    intervalFieldPath: 'cron.interval',
+    deleteExpiredFieldPath: 'cron.deleteExpired',
+    lockedFieldPath: 'cron.locked',
+    startedAtFieldPath: 'cron.startedAt',
+    finishedAtFieldPath: 'cron.finishedAt',
+    onDocument: (doc, cron) => console.log('onDocument', doc),
     onError: (err, cron) => console.log(err),
     onStart: (cron) => console.log('started ...'),
     onStop: (cron) => console.log('stopped'),
@@ -23,7 +28,7 @@ MongoClient.connect('mongodb://localhost:27017/test').then((db) => {
   setTimeout(function() {
     collection.insert({
       name: 'Ricky Martin Show',
-      enabled: true
+      cron: {enabled: true}
     });
   }, 2000);
 

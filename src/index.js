@@ -16,6 +16,15 @@ export class MongoCron {
   constructor(options={}) {
     this._collection = options.collection;
 
+    this._enabledFieldPath = options.enabledFieldPath || 'enabled';
+    this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
+    this._expireAtFieldPath = options.expireAtFieldPath || 'expireAt';
+    this._intervalFieldPath = options.intervalFieldPath || 'interval';
+    this._deleteExpiredFieldPath = options.deleteExpiredFieldPath || 'deleteExpired';
+    this._lockedFieldPath = options.lockedFieldPath || 'locked';
+    this._startedAtFieldPath = options.startedAtFieldPath || 'startedAt';
+    this._finishedAtFieldPath = options.finishedAtFieldPath || 'finishedAt';
+
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
     this._onStop = options.onStop;
@@ -140,28 +149,28 @@ export class MongoCron {
       {
         $and: [
           {
-            'enabled': true,
-            'locked': {$exists: false}
+            [this._enabledFieldPath]: true,
+            [this._lockedFieldPath]: {$exists: false}
           },
           {
             $or: [
-              {'waitUntil': {$lte: time}},
-              {'waitUntil': {$exists: false}}
+              {[this._waitUntilFieldPath]: {$lte: time}},
+              {[this._waitUntilFieldPath]: {$exists: false}}
             ]
           },
           {
             $or: [
-              {'expireAt': {$gte: time}},
-              {'expireAt': {$exists: false}}
+              {[this._expireAtFieldPath]: {$gte: time}},
+              {[this._expireAtFieldPath]: {$exists: false}}
             ]
           }
         ]
       },
       {
-        $set: {'locked': true, 'startedAt': time}
+        $set: {[this._lockedFieldPath]: true, [this._startedAtFieldPath]: time}
       },
       {
-        sort: {'waitUntil': 1},
+        sort: {[this._waitUntilFieldPath]: 1},
         returnOriginal: false
       }
     );
@@ -174,19 +183,19 @@ export class MongoCron {
   */
 
   getNextStart(doc) {
-    if (!doc.interval) { // not recurring job
+    if (!doc[this._intervalFieldPath]) { // not recurring job
       return null;
     }
 
-    let start = moment(doc.waitUntil);
+    let start = moment(doc[this._waitUntilFieldPath]);
     let future = moment().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
     }
 
     try { // new date
-      let schedule = later.parse.cron(doc.interval, true);
-      let dates = later.schedule(schedule).next(2, future.toDate(), doc.expireAt);
+      let schedule = later.parse.cron(doc[this._intervalFieldPath], true);
+      let dates = later.schedule(schedule).next(2, future.toDate(), doc[this._expireAtFieldPath]);
       let next = dates[1];
       return next instanceof Date ? next : null;
     } catch (err) {
@@ -203,17 +212,17 @@ export class MongoCron {
     let nextStart = this.getNextStart(doc);
     let _id = ObjectId(doc._id);
 
-    if (!nextStart && doc.deleteExpired) {
+    if (!nextStart && doc[this._deleteExpiredFieldPath]) {
       await this._collection.deleteOne({_id});
     } else if (!nextStart) {
       await this._collection.updateOne({_id}, {
-        $unset: {'locked': 1, 'waitUntil': 1},
-        $set: {'finishedAt': new Date(), 'enabled': false}
+        $unset: {[this._lockedFieldPath]: 1, [this._waitUntilFieldPath]: 1},
+        $set: {[this._finishedAtFieldPath]: new Date(), [this._enabledFieldPath]: false}
       });
     } else {
       await this._collection.updateOne({_id}, {
-        $unset: {'locked': 1},
-        $set: {'finishedAt': new Date(), 'waitUntil': nextStart}
+        $unset: {[this._lockedFieldPath]: 1},
+        $set: {[this._finishedAtFieldPath]: new Date(), [this._waitUntilFieldPath]: nextStart}
       });
     }
   }

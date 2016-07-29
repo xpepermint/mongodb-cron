@@ -60,7 +60,7 @@ After inserting the document above to the database, the `onDocument` callback, w
 
 ## Configuration & Details
 
-We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startedAt` field is set to the latest date and the `locked` field is set to `true`. When the processing ends the `finishedAt` field is set to the current date and the `locked` field is removed.
+We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startedAt` field is set to the latest date and the `locked` field is set to `true`. When the processing ends the `finishedAt` field is set to the current date, the `enabled` field is set tot `false` and the `locked` field is removed.
 
 We can create a one-time job which will start processing immediately just by setting the `enabled` field to `true`.
 
@@ -143,6 +143,12 @@ let cron = new MongoCron({
   intervalFieldPath: 'cron.interval',
   // (default=deleteExpired) The `deleteExpired` field path.
   deleteExpiredFieldPath: 'cron.deleteExpired',
+  // (stats field) The `locked` field path.
+  lockedFieldPath: 'cron.locked',
+  // (stats field) The `startedAt` field path.
+  startedAtFieldPath: 'cron.startedAt',
+  // (stats field) The `finishedAt` field path.
+  finishedAtFieldPath: 'cron.finishedAt',
 
   // A method which is triggered when the cron is started.
   onStart: async (cron) => {},
