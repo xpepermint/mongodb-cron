@@ -1,14 +1,16 @@
 {
   "name": "mongodb-cron",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
     "clean": "rm -Rf ./dist",
     "prebuild": "npm run clean; mkdir -p ./dist",
     "build": "babel ./src --out-dir ./dist --copy-files",
+    "preexample": "npm run build",
     "example": "npm run build; node ./example",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pretest": "npm run build",
+    "test": "ava"
   },
   "repository": {
     "type": "git",
@@ -27,6 +29,14 @@
     "collection",
     "capped"
   ],
+  "ava": {
+    "files": [
+      "./dist/__tests__/*.js",
+      "./dist/**/__tests__/*.js"
+    ],
+    "concurrency": 1,
+    "failFast": true
+  },
   "author": "Xpepermint (Kristijan Sedlak)",
   "license": "MIT",
   "bugs": {
@@ -34,6 +44,7 @@
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "devDependencies": {
+    "ava": "0.15.2",
     "babel-cli": "6.11.4",
     "babel-preset-node5": "11.1.0"
   },

@@ -1,13 +1,13 @@
-const {ObjectId} = require('mongodb');
-const moment = require('moment');
-const later = require('later');
-const sleep = require('es6-sleep').promise;
+import {ObjectId} from 'mongodb';
+import moment from 'moment';
+import later from 'later';
+import {promise as sleep} from 'es6-sleep';
 
 /*
 * Main class for converting a collection into cron.
 */
 
-exports.MongoCron = class {
+export class MongoCron {
 
   /*
   * Class constructor.
@@ -52,7 +52,7 @@ exports.MongoCron = class {
   async start() {
     if (!this.running) {
       this._running = true;
-      
+
       if (this._onStart) {
         await this._onStart(this);
       }
@@ -66,8 +66,12 @@ exports.MongoCron = class {
   * Starts the heartbit.
   */
 
-  async stop() {
+  async stop({force=false}={}) {
     this._running = false;
+
+    if (force) {
+      this._processing = false;
+    }
 
     do {
       if (!this._processing) {
@@ -126,8 +130,8 @@ exports.MongoCron = class {
   }
 
   /*
-  * A private method which prepares the next document for processing 
-  * and returns its updated version. 
+  * A private method which prepares the next document for processing
+  * and returns its updated version.
   */
 
   async lockNextDocument() {
@@ -136,29 +140,28 @@ exports.MongoCron = class {
       {
         $and: [
           {
-            'enabled': true, 
+            'enabled': true,
             'locked': {$exists: false}
           },
           {
             $or: [
-              {'startAt': {$lte: time}}, 
-              {'startAt': {$exists: false}}
+              {'waitUntil': {$lte: time}},
+              {'waitUntil': {$exists: false}}
             ]
           },
           {
             $or: [
-              {'stopAt': {$gte: time}}, 
-              {'stopAt': {$exists: false}}
+              {'expireAt': {$gte: time}},
+              {'expireAt': {$exists: false}}
             ]
           }
         ]
       },
       {
-        'locked': true, 
-        'startedAt': time
+        $set: {'locked': true, 'startedAt': time}
       },
       {
-        sort: {'startAt': 1},
+        sort: {'waitUntil': 1},
         returnOriginal: false
       }
     );
@@ -175,16 +178,17 @@ exports.MongoCron = class {
       return null;
     }
 
+    let start = moment(doc.waitUntil);
     let future = moment().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
-    let start = moment(doc.startAt);
     if (start >= future) { // already in future
-      return doc.startAt;
+      return start.toDate();
     }
 
     try { // new date
       let schedule = later.parse.cron(doc.interval, true);
-      let dates = later.schedule(schedule).next(2, future.toDate(), doc.stopAt);
-      return dates[1];
+      let dates = later.schedule(schedule).next(2, future.toDate(), doc.expireAt);
+      let next = dates[1];
+      return next instanceof Date ? next : null;
     } catch (err) {
       return null;
     }
@@ -192,24 +196,24 @@ exports.MongoCron = class {
 
   /*
   * Private method which tries to reschedule a document, marks it as expired or
-  * deletes a job if `removeExpired` is set to `true`.
+  * deletes a job if `deleteExpired` is set to `true`.
   */
 
   async rescheduleDocument(doc) {
     let nextStart = this.getNextStart(doc);
     let _id = ObjectId(doc._id);
 
-    if (!nextStart && doc.removeExpired) {
+    if (!nextStart && doc.deleteExpired) {
       await this._collection.deleteOne({_id});
     } else if (!nextStart) {
       await this._collection.updateOne({_id}, {
-        $unset: {'locked': 1, 'startAt': 1}, 
-        $set: {'stoppedAt': new Date()}
+        $unset: {'locked': 1, 'waitUntil': 1},
+        $set: {'stoppedAt': new Date(), 'enabled': false}
       });
     } else {
       await this._collection.updateOne({_id}, {
         $unset: {'locked': 1},
-        $set: {'stoppedAt': new Date(), 'startAt': nextStart}
+        $set: {'stoppedAt': new Date(), 'waitUntil': nextStart}
       });
     }
   }

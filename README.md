@@ -58,7 +58,7 @@ After inserting the document above to the database, the `onDocument` callback, w
 
 ## Configuration & Details
 
-We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startAt` field is updated the the latest date and the `locked` field is set to `true`. When the processing ends the `processedAt` field is set to the current date and the `locked` field is removed.
+We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `waitUntil` field is updated the the latest date and the `locked` field is set to `true`. When the processing ends the `processedAt` field is set to the current date and the `locked` field is removed.
 
 We can create a one-time job which will start processing immediately just by setting the `enabled` field to `true`.
 
@@ -69,12 +69,12 @@ collection.insert({
 });
 ```
 
-Job execution can be delayed by setting the `startAt` field.
+Job execution can be delayed by setting the `waitUntil` field.
 
 ```js
 collection.insert({
   ...
-  startAt: new Date('2016-01-01')
+  waitUntil: new Date('2016-01-01')
 });
 ```
 
@@ -101,15 +101,15 @@ The interval above consists of 6 values.
 └───────────────────────── second (0 - 59)
 ```
 
-A recurring job will repeat endlessly unless we limit that by setting the `stopAt` field. When a job expires it stops repeating. If we also set `removeExpired` field to `true`, a job is automatically deleted.
+A recurring job will repeat endlessly unless we limit that by setting the `expireAt` field. When a job expires it stops repeating. If we also set `deleteExpired` field to `true`, a job is automatically deleted.
 
 ```js
 collection.insert({
   enabled: true,
-  startAt: new Date('2016-01-01'),
+  waitUntil: new Date('2016-01-01'),
   interval: '* * * * * *',
-  stopAt: new Date('2020-01-01'),
-  removeExpired: true
+  expireAt: new Date('2020-01-01'),
+  deleteExpired: true
 });
 ```
 
@@ -119,12 +119,10 @@ Processing speed can be reduced when more and more documents are added into the 
 collection.createIndex({
   enabled: 1,
   locked: 1,
-  startAt: 1,
-  stopAt: 1
+  waitUntil: 1,
+  expireAt: 1
 });
 ```
-
-If 
 
 `MongoCron` class accepts several configuration options.
 
@@ -135,14 +133,14 @@ let cron = new MongoCron({
 
   // (default=enabled) The `enabled` field path.
   enabledFieldPath: 'cron.enabled',
-  // (default=startAt) The `startAt` field path.
-  startAtFieldPath: 'cron.startAt',
-  // (default=stopAt) The `stopAt` field path.
-  stopAtFieldPath: 'cron.startAt',
+  // (default=waitUntil) The `waitUntil` field path.
+  waitUntilFieldPath: 'cron.waitUntil',
+  // (default=expireAt) The `expireAt` field path.
+  expireAtFieldPath: 'cron.waitUntil',
   // (default=interval) The `interval` field path.
   intervalFieldPath: 'cron.interval',
-  // (default=removeExpired) The `removeExpired` field path.
-  removeExpiredFieldPath: 'cron.removeExpired',
+  // (default=deleteExpired) The `deleteExpired` field path.
+  deleteExpiredFieldPath: 'cron.deleteExpired',
 
   // A method which is triggered when the cron is started.
   onStart: async (cron) => {},
