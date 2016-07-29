@@ -118,6 +118,7 @@ Processing speed can be reduced when more and more documents are added into the 
 ```js
 collection.createIndex({
   enabled: 1,
+  locked: 1,
   startAt: 1,
   stopAt: 1
 });
@@ -131,6 +132,7 @@ If
 let cron = new MongoCron({
   // (required) MongoDB collection object.
   collection: db.collection('events'),
+
   // (default=enabled) The `enabled` field path.
   enabledFieldPath: 'cron.enabled',
   // (default=startAt) The `startAt` field path.
@@ -141,23 +143,25 @@ let cron = new MongoCron({
   intervalFieldPath: 'cron.interval',
   // (default=removeExpired) The `removeExpired` field path.
   removeExpiredFieldPath: 'cron.removeExpired',
+
   // A method which is triggered when the cron is started.
   onStart: async (cron) => {},
-  // A method which is triggered when a document should be processed.
-  onDocument: async (doc, cron) => {},
   // A method which is triggered when the cron is stopped.
   onStop: async (cron) => {},
+  // A method which is triggered when a document should be processed.
+  onDocument: async (doc, cron) => {},
   // A method which is triggered after the cron job has finished processing all 
   // waiting documents.
   onIdle: async (cron) => {},
   // A method which is triggered in case of an error.
   onError: async (err, cron) => {},
-  // (default=0) A variable which tells how many milliseconds the worker should 
-  // wait before checking for new jobs after all jobs has been processed.
-  idleDelay: 30000,
+  // (default=0) A variable which tells how fast the next job can be processed.
+  nextDelay: 1000,
   // (default=0) A variable which tells how many milliseconds the worker should 
   // wait before processing the same job again in case the job is a recurring job.
-  nextDelay: 60000,
-  
+  reprocessDelay: 1000,
+  // (default=0) A variable which tells how many milliseconds the worker should 
+  // wait before checking for new jobs after all jobs has been processed.
+  idleDelay: 1000
 });
 ```

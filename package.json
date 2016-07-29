@@ -1,20 +1,46 @@
 {
   "name": "mongodb-cron",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "MongoDB collection as crontab",
-  "main": "./src/index.js",
+  "main": "./dist/index.js",
   "scripts": {
+    "clean": "rm -Rf ./dist",
+    "prebuild": "npm run clean; mkdir -p ./dist",
+    "build": "babel ./src --out-dir ./dist --copy-files",
+    "example": "npm run build; node ./example",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xpepermint/mongodb-cron.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "mongo",
+    "mongodb",
+    "database",
+    "nosql",
+    "cron",
+    "schedule",
+    "scheduling",
+    "queue",
+    "job",
+    "collection",
+    "capped"
+  ],
+  "author": "Xpepermint (Kristijan Sedlak)",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/xpepermint/mongodb-cron/issues"
   },
-  "homepage": "https://github.com/xpepermint/mongodb-cron#readme"
+  "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
+  "devDependencies": {
+    "babel-cli": "6.11.4",
+    "babel-preset-node5": "11.1.0"
+  },
+  "dependencies": {
+    "es6-sleep": "2.0.2",
+    "later": "1.2.0",
+    "moment": "2.14.1",
+    "mongodb": "2.2.5"
+  }
 }
