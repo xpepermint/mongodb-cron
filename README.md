@@ -2,7 +2,7 @@
 
 > MongoDB collection as crontab
 
-This package offers a simple API for scheduling tasks and running recurring jobs on multiple [MongoDB](https://www.mongodb.org) collections. It uses the officially supported Node.js [driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions in cluster environments.
+This package offers a simple API for scheduling tasks and running recurring jobs on multiple [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a crontab list. You can even set multiple crontabs on the same collection. It uses the officially supported Node.js [driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions in cluster environments.
 
 <img src="giphy.gif" />
 
@@ -27,11 +27,11 @@ Start by initializing the database connection.
 ```js
 import {MongoClient} from 'mongodb';
 
-let db = await MongoClient.connect('mongodb://localhost:27017/testdb');
+let db = await MongoClient.connect('mongodb://localhost:27017/test');
 let collection = db.collection('events');
 ```
 
-Continue by initializing and starting the worker.
+Continue by initializing and starting a cron worker.
 
 ```js
 import {MongoCron} from 'mongodb-cron';
@@ -54,11 +54,11 @@ let res = await collection.insert({
 });
 ```
 
-After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how any collection can become a cron job queue. This is a very basic example so read the next section for advanced features.
+After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how any collection can become a cron job queue. We have a very basic example here so read the next section for advanced features.
 
 ## Configuration & Details
 
-We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `waitUntil` field is updated the the latest date and the `locked` field is set to `true`. When the processing ends the `processedAt` field is set to the current date and the `locked` field is removed.
+We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startedAt` field is set to the latest date and the `locked` field is set to `true`. When the processing ends the `finishedAt` field is set to the current date and the `locked` field is removed.
 
 We can create a one-time job which will start processing immediately just by setting the `enabled` field to `true`.
 
@@ -101,7 +101,7 @@ The interval above consists of 6 values.
 └───────────────────────── second (0 - 59)
 ```
 
-A recurring job will repeat endlessly unless we limit that by setting the `expireAt` field. When a job expires it stops repeating. If we also set `deleteExpired` field to `true`, a job is automatically deleted.
+A recurring job will repeat endlessly unless we limit that by setting the `expireAt` field. When a job expires it stops repeating. If we also set `deleteExpired` field to `true`, a job is automatically deleted from the database collection.
 
 ```js
 collection.insert({
@@ -113,7 +113,7 @@ collection.insert({
 });
 ```
 
-Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by using indexes.
+Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating an index.
 
 ```js
 collection.createIndex({
@@ -124,7 +124,7 @@ collection.createIndex({
 });
 ```
 
-`MongoCron` class accepts several configuration options.
+The `MongoCron` class accepts several configuration options.
 
 ```js
 let cron = new MongoCron({
@@ -148,11 +148,9 @@ let cron = new MongoCron({
   onStop: async (cron) => {},
   // A method which is triggered when a document should be processed.
   onDocument: async (doc, cron) => {},
-  // A method which is triggered after the cron job has finished processing all 
-  // waiting documents.
-  onIdle: async (cron) => {},
   // A method which is triggered in case of an error.
   onError: async (err, cron) => {},
+  
   // (default=0) A variable which tells how fast the next job can be processed.
   nextDelay: 1000,
   // (default=0) A variable which tells how many milliseconds the worker should 

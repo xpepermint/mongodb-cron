@@ -208,12 +208,12 @@ export class MongoCron {
     } else if (!nextStart) {
       await this._collection.updateOne({_id}, {
         $unset: {'locked': 1, 'waitUntil': 1},
-        $set: {'stoppedAt': new Date(), 'enabled': false}
+        $set: {'finishedAt': new Date(), 'enabled': false}
       });
     } else {
       await this._collection.updateOne({_id}, {
         $unset: {'locked': 1},
-        $set: {'stoppedAt': new Date(), 'waitUntil': nextStart}
+        $set: {'finishedAt': new Date(), 'waitUntil': nextStart}
       });
     }
   }
