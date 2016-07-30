@@ -208,14 +208,12 @@ let cron = new MongoCron({
   intervalFieldPath: 'cron.interval',
   // (default=deleteExpired) The `deleteExpired` field path.
   deleteExpiredFieldPath: 'cron.deleteExpired',
-  // (stats field) The `locked` field path.
+  // (default=locked) The `locked` field path.
   lockedFieldPath: 'cron.locked',
-  // (stats field) The `startedAt` field path.
+  // (default=startedAt) The `startedAt` field path.
   startedAtFieldPath: 'cron.startedAt',
-  // (stats field) The `startedTimes` field path.
-  startedTimesFieldPath: 'cron.starteTimes',
-  // (stats field) The `finishedAt` field path.
-  finishedAtFieldPath: 'cron.finishedAt',
+  // (default=finishedAt) The `finishedAt` field path.
+  finishedAtFieldPath: 'cron.finishedAt'
 });
 ```
 

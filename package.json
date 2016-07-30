@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "preexample": "npm run build",
     "example": "npm run build; node ./example",
     "pretest": "npm run build",
+    "prepublish": "npm run build",
     "test": "ava"
   },
   "repository": {
