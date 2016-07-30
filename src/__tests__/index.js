@@ -6,10 +6,11 @@ import moment from 'moment';
 test.beforeEach(async (t) => {
   t.context.db = await MongoClient.connect('mongodb://localhost:27017/mongodb-cron-test');
   t.context.collection = t.context.db.collection('events');
-  try { await t.context.collection.drop() } catch(e) {}
+  try { await t.context.collection.drop() } catch(e) {} // required
 });
 
 test.afterEach(async (t) => {
+  await t.context.collection.drop();
   await t.context.db.close();
 });
 
@@ -153,6 +154,55 @@ test.serial.cb('document with `sid=1` should be processed only by the `sid=1` se
         t.fail();
       }
       t.end();
+    })
+  }, 2000);
+});
+
+test.serial.cb('locked documents should stay untouched by other processes', (t) => {
+  let {collection} = t.context;
+  let cron = new MongoCron({
+    collection
+  });
+  cron.start();
+  collection.insert({
+    enabled: true,
+    locked: true,
+    startedAt: new Date()
+  });
+  setTimeout(function() {
+    collection.count({finishedAt: {$exists: true}}).then((n) => {
+      if (n === 0) {
+        t.pass();
+      } else {
+        t.fail();
+      }
+      t.end();
+      cron.stop({force: true});
+    })
+  }, 2000);
+});
+
+test.serial.cb('locked documents should restart after `lockTimeout` milliseconds', (t) => {
+  let {collection} = t.context;
+  let cron = new MongoCron({
+    collection,
+    lockTimeout: 10
+  });
+  cron.start();
+  collection.insert({
+    enabled: true,
+    locked: true,
+    startedAt: new Date()
+  });
+  setTimeout(function() {
+    collection.count({finishedAt: {$exists: true}}).then((n) => {
+      if (n === 1) {
+        t.pass();
+      } else {
+        t.fail();
+      }
+      t.end();
+      cron.stop({force: true});
     })
   }, 2000);
 });

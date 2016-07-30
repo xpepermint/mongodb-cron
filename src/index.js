@@ -17,16 +17,6 @@ export class MongoCron {
     this._collection = options.collection;
     this._sid = options.sid;
 
-    this._enabledFieldPath = options.enabledFieldPath || 'enabled';
-    this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
-    this._expireAtFieldPath = options.expireAtFieldPath || 'expireAt';
-    this._intervalFieldPath = options.intervalFieldPath || 'interval';
-    this._deleteExpiredFieldPath = options.deleteExpiredFieldPath || 'deleteExpired';
-    this._lockedFieldPath = options.lockedFieldPath || 'locked';
-    this._startedAtFieldPath = options.startedAtFieldPath || 'startedAt';
-    this._finishedAtFieldPath = options.finishedAtFieldPath || 'finishedAt';
-    this._sidFieldPath = options.sidFieldPath || 'sid';
-
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
     this._onStop = options.onStop;
@@ -35,6 +25,18 @@ export class MongoCron {
     this._nextDelay = options.nextDelay || 0; // wait before processing next job
     this._reprocessDelay = options.reprocessDelay || 0; // wait before processing the same job again
     this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
+
+    this._lockTimeout = options.lockTimeout || 0; // the time after a locked job is restarted (0 for disable)
+
+    this._sidFieldPath = options.sidFieldPath || 'sid';
+    this._enabledFieldPath = options.enabledFieldPath || 'enabled';
+    this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
+    this._expireAtFieldPath = options.expireAtFieldPath || 'expireAt';
+    this._intervalFieldPath = options.intervalFieldPath || 'interval';
+    this._deleteExpiredFieldPath = options.deleteExpiredFieldPath || 'deleteExpired';
+    this._lockedFieldPath = options.lockedFieldPath || 'locked';
+    this._startedAtFieldPath = options.startedAtFieldPath || 'startedAt';
+    this._finishedAtFieldPath = options.finishedAtFieldPath || 'finishedAt';
 
     this._running = false;
     this._processing = false;
@@ -146,14 +148,12 @@ export class MongoCron {
   */
 
   async lockNextDocument() {
-    let time = new Date();
+    let currentTime = new Date();
+    let lockTimeout = this._lockTimeout > 0 ? moment().add(this._lockTimeout, 'millisecond').toDate() : null;
+
     let res = await this._collection.findOneAndUpdate(
       {
         $and: [
-          {
-            [this._enabledFieldPath]: true,
-            [this._lockedFieldPath]: {$exists: false}
-          },
           {
             $or: [
               {[this._sidFieldPath]: this._sid},
@@ -161,25 +161,34 @@ export class MongoCron {
             ]
           },
           {
+            [this._enabledFieldPath]: true
+          },
+          {
             $or: [
-              {[this._waitUntilFieldPath]: {$lte: time}},
+              {[this._waitUntilFieldPath]: {$lte: currentTime}},
               {[this._waitUntilFieldPath]: {$exists: false}}
             ]
           },
           {
             $or: [
-              {[this._expireAtFieldPath]: {$gte: time}},
+              {[this._expireAtFieldPath]: {$gte: currentTime}},
               {[this._expireAtFieldPath]: {$exists: false}}
             ]
-          }
+          },
+          {
+            $or: [
+              {[this._lockedFieldPath]: {$exists: false}},
+              lockTimeout ? {[this._startedAtFieldPath]: {$lte: lockTimeout}} : null
+            ].filter(c => !!c)
+          },
         ]
       },
       {
         $set: Object.assign(
           {
             [this._lockedFieldPath]: true, 
-            [this._startedAtFieldPath]: time,
-          }, 
+            [this._startedAtFieldPath]: currentTime
+          },
           this._sid ? {[this._sidFieldPath]: this._sid} : {}
         ),
         $unset: {
@@ -253,25 +262,6 @@ export class MongoCron {
         }
       });
     }
-  }
-
-  async resetUnfinished(timeout) {
-    let pastDate = moment().add(timeout, 'millisecond');
-    
-    await this._collection.updateMany(
-      {
-        [this._enabledFieldPath]: true,
-        [this._lockedFieldPath]: {$exists: true},
-        [this._startedAtFieldPath]: {$lte: pastDate.getDate()},
-        [this._finishedAtFieldPath]: {$exists: false},
-      },
-      {
-        $unset: {
-          [this._lockedFieldPath]: 1,
-          [this._startedAtFieldPath]: 1
-        }
-      }
-    );
   }
 
 }

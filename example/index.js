@@ -22,6 +22,7 @@ MongoClient.connect('mongodb://localhost:27017/test').then((db) => {
     nextDelay: 0,
     reprocessDelay: 1000,
     idleDelay: 1000,
+    lockTimeout: 5000
   });
   cron.start().catch(console.log);
 

@@ -137,6 +137,17 @@ collection.insert({
 });
 ```
 
+## Handling Retries And Server Blackouts
+
+In case of errors or when a hosting server doesn't shutdown gracefully, jobs can stay locked forever. We can set the `lockTimeout` variable to automatically restart these jobs. The variable holds an estimate of milliseconds in which a single job should finish execution. If a job doesn't get unlocked after that estimation the system starts job execution as it would be a normal waiting job.
+
+```js
+let cron = new MongoCron({
+  ...
+  lockTimeout: 1000 * 60 * 60, // after 1h
+});
+```
+
 ## Collection Speed
 
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
@@ -145,9 +156,10 @@ Processing speed can be reduced when more and more documents are added into the 
 collection.createIndex({
   sid: 1,
   enabled: 1,
-  locked: 1,
   waitUntil: 1,
-  expireAt: 1
+  expireAt: 1,
+  locked: 1,
+  startedAt: 1
 });
 ```
 
@@ -161,25 +173,6 @@ let cron = new MongoCron({
   collection: db.collection('events'),
   // (default=null) A variable for uniquelly identifying a server instance.
   sid: 's100',
-
-  // (default=enabled) The `enabled` field path.
-  enabledFieldPath: 'cron.enabled',
-  // (default=waitUntil) The `waitUntil` field path.
-  waitUntilFieldPath: 'cron.waitUntil',
-  // (default=expireAt) The `expireAt` field path.
-  expireAtFieldPath: 'cron.waitUntil',
-  // (default=interval) The `interval` field path.
-  intervalFieldPath: 'cron.interval',
-  // (default=deleteExpired) The `deleteExpired` field path.
-  deleteExpiredFieldPath: 'cron.deleteExpired',
-  // (stats field) The `locked` field path.
-  lockedFieldPath: 'cron.locked',
-  // (stats field) The `startedAt` field path.
-  startedAtFieldPath: 'cron.startedAt',
-  // (stats field) The `finishedAt` field path.
-  finishedAtFieldPath: 'cron.finishedAt',
-  // (stats field) The `sid` field path.
-  sidFieldPath: 'cron.sid',
 
   // A method which is triggered when the cron is started.
   onStart: async (cron) => {},
@@ -197,6 +190,64 @@ let cron = new MongoCron({
   reprocessDelay: 1000,
   // (default=0) A variable which tells how many milliseconds the worker should 
   // wait before checking for new jobs after all jobs has been processed.
-  idleDelay: 1000
+  idleDelay: 1000,
+
+  // (default=0) A variable for restarting/retrying jobs that fail or jobs that 
+  // run unexpectedly long. 
+  lockTimeout: 60000,
+
+  // (default=sid) The `sid` field path.
+  sidFieldPath: 'cron.sid',
+  // (default=enabled) The `enabled` field path.
+  enabledFieldPath: 'cron.enabled',
+  // (default=waitUntil) The `waitUntil` field path.
+  waitUntilFieldPath: 'cron.waitUntil',
+  // (default=expireAt) The `expireAt` field path.
+  expireAtFieldPath: 'cron.waitUntil',
+  // (default=interval) The `interval` field path.
+  intervalFieldPath: 'cron.interval',
+  // (default=deleteExpired) The `deleteExpired` field path.
+  deleteExpiredFieldPath: 'cron.deleteExpired',
+  // (stats field) The `locked` field path.
+  lockedFieldPath: 'cron.locked',
+  // (stats field) The `startedAt` field path.
+  startedAtFieldPath: 'cron.startedAt',
+  // (stats field) The `startedTimes` field path.
+  startedTimesFieldPath: 'cron.starteTimes',
+  // (stats field) The `finishedAt` field path.
+  finishedAtFieldPath: 'cron.finishedAt',
 });
+```
+
+## Best Practice
+
+* Make your jobs idempotent and transactional. [Idempotency](https://en.wikipedia.org/wiki/Idempotence) means that your job can safely execute multiple times.
+* Run this package in cluste mode. Design your jobs in a way that you can run lots of them in parallel.
+
+## Contribute
+
+Let's make this package even better. Please contribute!
+
+## Licence
+
+```
+Copyright (c) 2016 Kristijan Sedlak <xpepermint@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
