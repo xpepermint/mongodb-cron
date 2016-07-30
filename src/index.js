@@ -15,6 +15,7 @@ export class MongoCron {
 
   constructor(options={}) {
     this._collection = options.collection;
+    this._sid = options.sid;
 
     this._enabledFieldPath = options.enabledFieldPath || 'enabled';
     this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
@@ -24,6 +25,7 @@ export class MongoCron {
     this._lockedFieldPath = options.lockedFieldPath || 'locked';
     this._startedAtFieldPath = options.startedAtFieldPath || 'startedAt';
     this._finishedAtFieldPath = options.finishedAtFieldPath || 'finishedAt';
+    this._sidFieldPath = options.sidFieldPath || 'sid';
 
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
@@ -154,6 +156,12 @@ export class MongoCron {
           },
           {
             $or: [
+              {[this._sidFieldPath]: this._sid},
+              {[this._sidFieldPath]: {$exists: false}}
+            ]
+          },
+          {
+            $or: [
               {[this._waitUntilFieldPath]: {$lte: time}},
               {[this._waitUntilFieldPath]: {$exists: false}}
             ]
@@ -167,7 +175,16 @@ export class MongoCron {
         ]
       },
       {
-        $set: {[this._lockedFieldPath]: true, [this._startedAtFieldPath]: time}
+        $set: Object.assign(
+          {
+            [this._lockedFieldPath]: true, 
+            [this._startedAtFieldPath]: time,
+          }, 
+          this._sid ? {[this._sidFieldPath]: this._sid} : {}
+        ),
+        $unset: {
+          [this._finishedAtFieldPath]: 1
+        }
       },
       {
         sort: {[this._waitUntilFieldPath]: 1},
@@ -216,15 +233,45 @@ export class MongoCron {
       await this._collection.deleteOne({_id});
     } else if (!nextStart) {
       await this._collection.updateOne({_id}, {
-        $unset: {[this._lockedFieldPath]: 1, [this._waitUntilFieldPath]: 1},
-        $set: {[this._finishedAtFieldPath]: new Date(), [this._enabledFieldPath]: false}
+        $unset: {
+          [this._lockedFieldPath]: 1, 
+          [this._waitUntilFieldPath]: 1
+        },
+        $set: {
+          [this._finishedAtFieldPath]: new Date(), 
+          [this._enabledFieldPath]: false
+        }
       });
     } else {
       await this._collection.updateOne({_id}, {
-        $unset: {[this._lockedFieldPath]: 1},
-        $set: {[this._finishedAtFieldPath]: new Date(), [this._waitUntilFieldPath]: nextStart}
+        $unset: {
+          [this._lockedFieldPath]: 1
+        },
+        $set: {
+          [this._finishedAtFieldPath]: new Date(), 
+          [this._waitUntilFieldPath]: nextStart
+        }
       });
     }
+  }
+
+  async resetUnfinished(timeout) {
+    let pastDate = moment().add(timeout, 'millisecond');
+    
+    await this._collection.updateMany(
+      {
+        [this._enabledFieldPath]: true,
+        [this._lockedFieldPath]: {$exists: true},
+        [this._startedAtFieldPath]: {$lte: pastDate.getDate()},
+        [this._finishedAtFieldPath]: {$exists: false},
+      },
+      {
+        $unset: {
+          [this._lockedFieldPath]: 1,
+          [this._startedAtFieldPath]: 1
+        }
+      }
+    );
   }
 
 }

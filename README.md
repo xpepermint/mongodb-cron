@@ -58,7 +58,7 @@ let res = await collection.insert({
 
 After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how any collection can become a cron job queue. We have a very basic example here so read the next section for advanced features.
 
-## Configuration & Details
+## Enqueuing Jobs
 
 We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startedAt` field is set to the latest date and the `locked` field is set to `true`. When the processing ends the `finishedAt` field is set to the current date, the `enabled` field is set tot `false` and the `locked` field is removed.
 
@@ -115,10 +115,35 @@ collection.insert({
 });
 ```
 
-Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating an index.
+## Cluster Environments
+
+Each cron instance can have its own unique identification. This is especially useful in cluster environments, where you have multiple physical servers. 
+
+To uniquelly identify a server we first need to set the `sid` option when creating a new cron instance. Each document, processed by this server instance, will now include the `sid` field with this unique server name.
+
+```js
+let cron = new MongoCron({
+  ...
+  sid: 's100' // unique server name
+});
+```
+
+You can now also enqueue documents for a particular server by setting the `sid` field on the document. The job will picked only by the specified server and will be ignored by other instances in the cluster of server.
+
+```js
+collection.insert({
+  ...
+  sid: 's100'
+});
+```
+
+## Collection Speed
+
+Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 
 ```js
 collection.createIndex({
+  sid: 1,
   enabled: 1,
   locked: 1,
   waitUntil: 1,
@@ -126,12 +151,16 @@ collection.createIndex({
 });
 ```
 
+## Cron Options
+
 The `MongoCron` class accepts several configuration options.
 
 ```js
 let cron = new MongoCron({
   // (required) MongoDB collection object.
   collection: db.collection('events'),
+  // (default=null) A variable for uniquelly identifying a server instance.
+  sid: 's100',
 
   // (default=enabled) The `enabled` field path.
   enabledFieldPath: 'cron.enabled',
@@ -149,6 +178,8 @@ let cron = new MongoCron({
   startedAtFieldPath: 'cron.startedAt',
   // (stats field) The `finishedAt` field path.
   finishedAtFieldPath: 'cron.finishedAt',
+  // (stats field) The `sid` field path.
+  sidFieldPath: 'cron.sid',
 
   // A method which is triggered when the cron is started.
   onStart: async (cron) => {},

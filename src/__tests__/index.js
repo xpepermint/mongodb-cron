@@ -6,10 +6,10 @@ import moment from 'moment';
 test.beforeEach(async (t) => {
   t.context.db = await MongoClient.connect('mongodb://localhost:27017/mongodb-cron-test');
   t.context.collection = t.context.db.collection('events');
+  try { await t.context.collection.drop() } catch(e) {}
 });
 
 test.afterEach(async (t) => {
-  await t.context.collection.drop();
   await t.context.db.close();
 });
 
@@ -116,6 +116,38 @@ test.serial.cb('document with `deleteExpired` should be deleted when expired', (
     cron.stop();
     collection.count().then((n) => {
       if (n === 0) {
+        t.pass();
+      } else {
+        t.fail();
+      }
+      t.end();
+    })
+  }, 2000);
+});
+
+test.serial.cb('document with `sid=1` should be processed only by the `sid=1` server', (t) => {
+  let {collection} = t.context;
+  let cron0 = new MongoCron({
+    collection,
+  });
+  let cron1 = new MongoCron({
+    collection,
+    sid: '1'
+  });
+  cron0.start();
+  cron1.start();
+  collection.insert([
+    {enabled: true, sid: '1'},
+    {enabled: true},
+    {enabled: true, sid: '1'},
+    {enabled: true},
+    {enabled: true, sid: '1'}
+  ]);
+  setTimeout(() => {
+    cron0.stop();
+    cron1.stop();
+    collection.count({sid: '1'}).then((n) => {
+      if (n >= 3 && n <= 5) {
         t.pass();
       } else {
         t.fail();
