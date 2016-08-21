@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
@@ -45,7 +45,7 @@
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "devDependencies": {
-    "ava": "0.15.2",
+    "ava": "0.16.0",
     "babel-cli": "6.11.4",
     "babel-preset-node5": "11.1.0"
   },
