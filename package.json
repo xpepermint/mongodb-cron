@@ -1,16 +1,15 @@
 {
   "name": "mongodb-cron",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
     "clean": "rm -Rf ./dist",
     "prebuild": "npm run clean; mkdir -p ./dist",
     "build": "babel ./src --out-dir ./dist --copy-files",
-    "preexample": "npm run build",
-    "example": "npm run build; node ./example",
-    "pretest": "npm run build",
+    "example": "babel-node ./example",
     "prepublish": "npm run build",
+    "pretest": "npm run build",
     "test": "ava"
   },
   "repository": {
@@ -27,13 +26,17 @@
     "scheduling",
     "queue",
     "job",
+    "jobs",
     "collection",
-    "capped"
+    "collections",
+    "capped",
+    "redis",
+    "ioredis"
   ],
   "ava": {
     "files": [
-      "./dist/__tests__/*.js",
-      "./dist/**/__tests__/*.js"
+      "./tests/*.js",
+      "./tests/**/*.js"
     ],
     "concurrency": 1,
     "failFast": true
@@ -45,14 +48,18 @@
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "devDependencies": {
-    "ava": "0.16.0",
-    "babel-cli": "6.11.4",
-    "babel-preset-node5": "11.1.0"
+    "ava": "0.16.x",
+    "babel-cli": "6.14.x",
+    "babel-preset-node5": "11.1.x"
+  },
+  "peerDependencies": {
+    "ioredis": "2.3.x",
+    "mongodb": "2.2.x"
   },
   "dependencies": {
-    "es6-sleep": "2.0.2",
-    "later": "1.2.0",
-    "moment": "2.14.1",
-    "mongodb": "2.2.7"
+    "dot-object": "1.5.2",
+    "es6-sleep": "2.0.x",
+    "later": "1.2.x",
+    "moment": "2.15.x"
   }
 }

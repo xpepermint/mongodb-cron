@@ -4,19 +4,19 @@
 
 > MongoDB collection as crontab
 
-This package offers a simple API for scheduling tasks and running recurring jobs on multiple [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a crontab list. You can even set multiple crontabs on the same collection. It uses the officially supported Node.js [driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions in cluster environments.
+This package offers a simple API for scheduling tasks and running recurring jobs on [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a job queue or crontab list. You can even set multiple crontabs on the same collection. It uses the officially supported [Node.js driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). Beside the general crontab features, the package provides some additional functionality as are execution speed limiting, quotas and processing pools. It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions even in cluster environments.
 
 <img src="giphy.gif" />
 
 ## Setup
 
 ```
-$ npm install --save mongodb-cron
+$ npm install --save ioredis mongodb mongodb-cron
 ```
 
 ## Quick Start
 
-Below, we create a simple example to show the benefit of using this package in your Node.js projects. To make things as clean as possible, we use [Babel](https://babeljs.io/) with ES7 features thus we can wrap our code into the async block.
+Below, is a simple example to show the benefit of using this package in your Node.js projects. To make things as clean as possible, we use [Babel](https://babeljs.io/) with ES7 features, thus we can wrap our code into the async block.
 
 ```js
 (async function() {
@@ -30,14 +30,14 @@ Start by initializing the database connection.
 import {MongoClient} from 'mongodb';
 
 let db = await MongoClient.connect('mongodb://localhost:27017/test');
-let collection = db.collection('events');
 ```
 
-Continue by initializing and starting a cron worker.
+Continue by initializing and starting a collection worker.
 
 ```js
 import {MongoCron} from 'mongodb-cron';
 
+let collection = db.collection('events');
 let cron = new MongoCron({
   collection,
   onDocument: async (doc, cron) => console.log(doc),
@@ -56,20 +56,26 @@ let res = await collection.insert({
 });
 ```
 
-After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how any collection can become a cron job queue. We have a very basic example here so read the next section for advanced features.
+After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how a collection becomes a job queue. We have a very basic example here so read the next section for advanced features.
 
-## Enqueuing Jobs
+## Jobs
 
-We can create a **one-time** or **recurring** jobs. Every time the document processing starts the `startedAt` field is set to the latest date and the `locked` field is set to `true`. When the processing ends the `finishedAt` field is set to the current date, the `enabled` field is set tot `false` and the `locked` field is removed.
+### One-time Tasks
 
-We can create a one-time job which will start processing immediately just by setting the `enabled` field to `true`.
+For creating a one-time job we only need to set the `processable` field to `true`. This will trigger the processing of a document immediately.
 
 ```js
 collection.insert({
   ...
-  enabled: true
+  processable: true
 });
 ```
+
+When the processing of a document starts the `lockUntil` field is set which locks the document for a certain amount of time in which (we know that) the document will be processed (lock timeout is configurable). This prevents race conditions and ensures that a job is always processed by a single process at a time.
+
+When the processing ends, the `processable` and `lockUntil` fields are removed. If the processing is interrupted (e.g. server shutdown), the `lockUntil` field may stay on the document but has no effect as soon as its value becomes the past thus the system will automatically recover and transparently continue.
+
+### Deferred Execution
 
 Job execution can be delayed by setting the `waitUntil` field.
 
@@ -79,6 +85,8 @@ collection.insert({
   waitUntil: new Date('2016-01-01')
 });
 ```
+
+### Recurring Jobs
 
 By setting the `interval` field we define a recurring job.
 
@@ -92,139 +100,113 @@ collection.insert({
 The interval above consists of 6 values.
 
 ```
-*    *    *    *    *    *
-┬    ┬    ┬    ┬    ┬    ┬
-│    │    │    │    │    |
-│    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
-│    │    │    │    └───── month (1 - 12)
-│    │    │    └────────── day of month (1 - 31)
-│    │    └─────────────── hour (0 - 23)
-│    └──────────────────── minute (0 - 59)
-└───────────────────────── second (0 - 59)
+* * * * * *
+┬ ┬ ┬ ┬ ┬ ┬
+│ │ │ │ │ └── day of week (0 - 7) (0 or 7 is Sun)
+│ │ │ │ └──── month (1 - 12)
+│ │ │ └────── day of month (1 - 31)
+│ │ └──────── hour (0 - 23)
+│ └────────── minute (0 - 59)
+└──────────── second (0 - 59)
 ```
 
-A recurring job will repeat endlessly unless we limit that by setting the `expireAt` field. When a job expires it stops repeating. If we also set `deleteExpired` field to `true`, a job is automatically deleted from the database collection.
+A recurring job will repeat endlessly unless we limit that by setting the `repeatUntil` field. When a job expires it stops repeating by removing the `processable` field.
 
 ```js
 collection.insert({
-  enabled: true,
-  waitUntil: new Date('2016-01-01'),
+  ...
   interval: '* * * * * *',
-  expireAt: new Date('2020-01-01'),
-  deleteExpired: true
+  repeatUntil: new Date('2020-01-01')
 });
 ```
 
-## Cluster Environments
+### Remove When Completed
 
-Each cron instance can have its own unique identification. This is especially useful in cluster environments, where you have multiple physical servers. 
+A job can automatically remove itself from the database collection when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
 
-To uniquelly identify a server we first need to set the `sid` option when creating a new cron instance. Each document, processed by this server instance, will now include the `sid` field with this unique server name.
+### API
+
+**new MongoCron({})**
+> The core class for converting a MongoDB collection into a job queue.
+
+| Option | Type | Required | Default | Description
+|--------|------|----------|---------|------------
+| collection | Object | Yes | - | MongoDB collection object.
+| onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
+| onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
+| onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
+| onError | Function/Promise | No | - | A method which is triggered in case of an error.
+| nextDelay | Integer | No | 0 | A variable which tells how fast the next job can be processed.
+| reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
+| idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
+| lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
+| processableFieldPath | String | No | processing | The `processing` field path.
+| lockUntilFieldPath | String | No | lockUntil | The `lockUntil` field path.
+| waitUntilFieldPath | String | No | waitUntil | The `waitUntil` field path.
+| intervalFieldPath | String | No | interval | The `interval` field path.
+| repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
+| autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
 
 ```js
 let cron = new MongoCron({
-  ...
-  sid: 's100' // unique server name
+  collection: db.collection('events'),
+  onStart: async (cron) => {},
+  onStop: async (cron) => {},
+  onDocument: async (doc, cron) => {},
+  onError: async (err, cron) => {},
+  nextDelay: 1000,
+  reprocessDelay: 1000,
+  idleDelay: 10000,
+  lockDuration: 600000,
+  processableFieldPath: 'cron.processing',
+  lockUntilFieldPath: 'cron.lockUntil',
+  waitUntilFieldPath: 'cron.waitUntil',
+  intervalFieldPath: 'cron.interval',
+  repeatUntilFieldPath: 'cron.repeatUntil',
+  autoRemoveFieldPath: 'cron.autoRemove'
 });
 ```
 
-You can now also enqueue documents for a particular server by setting the `sid` field on the document. The job will picked only by the specified server and will be ignored by other instances in the cluster of server.
+**cron.start()**:Promise
+> Starts the cron processor.
 
-```js
-collection.insert({
-  ...
-  sid: 's100'
-});
-```
+**cron.stop()**:Promise
+> Stops the cron processor.
 
-## Handling Retries And Server Blackouts
+**cron.getNextStart(doc)**:Date
+> Calculates and returns the next available start date for the provided document.
 
-In case of errors or when a hosting server doesn't shutdown gracefully, jobs can stay locked forever. We can set the `lockTimeout` variable to automatically restart these jobs. The variable holds an estimate of milliseconds in which a single job should finish execution. If a job doesn't get unlocked after that estimation the system starts job execution as it would be a normal waiting job.
+| Option | Type | Required | Default | Description
+|--------|------|----------|---------|------------
+| doc | Object | Yes | - | Collection's document.
 
-```js
-let cron = new MongoCron({
-  ...
-  lockTimeout: 1000 * 60 * 60, // after 1h
-});
-```
+**cron.isRunning**:Boolean
+> Returns true if the cron is started.
 
-## Collection Speed
+**cron.isProcessing**:Boolean
+> Returns true if cron is processing a document.
+
+**cron.collection**:Object
+> Returns MongoDB collection which is used by this class.
+
+### Processing Speed
 
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 
 ```js
 collection.createIndex({
-  sid: 1,
-  enabled: 1,
-  waitUntil: 1,
-  expireAt: 1,
-  locked: 1,
-  startedAt: 1
-});
-```
-
-## Cron Options
-
-The `MongoCron` class accepts several configuration options.
-
-```js
-let cron = new MongoCron({
-  // (required) MongoDB collection object.
-  collection: db.collection('events'),
-  // (default=null) A variable for uniquelly identifying a server instance.
-  sid: 's100',
-
-  // A method which is triggered when the cron is started.
-  onStart: async (cron) => {},
-  // A method which is triggered when the cron is stopped.
-  onStop: async (cron) => {},
-  // A method which is triggered when a document should be processed.
-  onDocument: async (doc, cron) => {},
-  // A method which is triggered in case of an error.
-  onError: async (err, cron) => {},
-
-  // (default=0) A variable which tells how fast the next job can be processed.
-  nextDelay: 1000,
-  // (default=0) A variable which tells how many milliseconds the worker should 
-  // wait before processing the same job again in case the job is a recurring job.
-  reprocessDelay: 1000,
-  // (default=0) A variable which tells how many milliseconds the worker should 
-  // wait before checking for new jobs after all jobs has been processed.
-  idleDelay: 1000,
-
-  // (default=0) A variable for restarting/retrying jobs that fail or jobs that 
-  // run unexpectedly long. 
-  lockTimeout: 60000,
-
-  // (default=sid) The `sid` field path.
-  sidFieldPath: 'cron.sid',
-  // (default=enabled) The `enabled` field path.
-  enabledFieldPath: 'cron.enabled',
-  // (default=waitUntil) The `waitUntil` field path.
-  waitUntilFieldPath: 'cron.waitUntil',
-  // (default=expireAt) The `expireAt` field path.
-  expireAtFieldPath: 'cron.waitUntil',
-  // (default=interval) The `interval` field path.
-  intervalFieldPath: 'cron.interval',
-  // (default=deleteExpired) The `deleteExpired` field path.
-  deleteExpiredFieldPath: 'cron.deleteExpired',
-  // (default=locked) The `locked` field path.
-  lockedFieldPath: 'cron.locked',
-  // (default=startedAt) The `startedAt` field path.
-  startedAtFieldPath: 'cron.startedAt',
-  // (default=finishedAt) The `finishedAt` field path.
-  finishedAtFieldPath: 'cron.finishedAt'
+  processable: 1,
+  lockUntil: 1,
+  waitUntil: 1
+}, {
+  sparse: true
 });
 ```
 
 ## Best Practice
 
 * Make your jobs idempotent and transactional. [Idempotency](https://en.wikipedia.org/wiki/Idempotence) means that your job can safely execute multiple times.
-* Run this package in cluste mode. Design your jobs in a way that you can run lots of them in parallel.
-
-## Contribute
-
-Let's make this package even better. Please contribute!
+* Run this package in cluster mode. Design your jobs in a way that you can run lots of them in parallel.
 
 ## Licence
 
