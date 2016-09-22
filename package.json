@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
@@ -50,10 +50,10 @@
   "devDependencies": {
     "ava": "0.16.x",
     "babel-cli": "6.14.x",
-    "babel-preset-node5": "11.1.x"
+    "babel-preset-node5": "11.1.x",
+    "mongodb": "2.2.x"
   },
   "peerDependencies": {
-    "ioredis": "2.3.x",
     "mongodb": "2.2.x"
   },
   "dependencies": {
