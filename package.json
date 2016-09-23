@@ -54,6 +54,7 @@
     "mongodb": "2.2.x"
   },
   "peerDependencies": {
+    "ioredis": "2.3.x",
     "mongodb": "2.2.x"
   },
   "dependencies": {
