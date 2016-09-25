@@ -1,1 +1,3 @@
-exports.MongoCron = require('./cron').MongoCron;
+import {MongoCron} from './cron';
+
+export {MongoCron};

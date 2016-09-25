@@ -38,21 +38,24 @@ class MongoCron {
   constructor() {
     let options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 
-    this._collection = options.collection;
     this._isRunning = false;
     this._isProcessing = false;
 
-    this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
-
-    this._nextDelay = options.nextDelay || 0; // wait before processing next job
-    this._reprocessDelay = options.reprocessDelay || 0; // wait before processing the same job again
-    this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
+    this._collection = options.collection;
 
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
     this._onStop = options.onStop;
     this._onError = options.onError;
 
+    this._nextDelay = options.nextDelay || 0; // wait before processing next job
+    this._reprocessDelay = options.reprocessDelay || 0; // wait before processing the same job again
+    this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
+    this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
+
+    this._watchedNamespaces = options.watchedNamespaces || [];
+
+    this._namespaceFieldPath = options.namespaceFieldPath || 'namespace';
     this._processableFieldPath = options.processableFieldPath || 'processable';
     this._lockUntilFieldPath = options.lockUntilFieldPath || 'lockUntil';
     this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
@@ -78,7 +81,7 @@ class MongoCron {
   }
 
   /*
-  * Returns MongoDB collection which is used by this class.
+  * Returns the MongoDB collection.
   */
 
   get collection() {
@@ -117,7 +120,7 @@ class MongoCron {
 
       if (_this2._isProcessing) {
         yield (0, _es6Sleep.promise)(300);
-        return process.nextTick(_this2.stop.bind(_this2));
+        return process.nextTick(_this2.stop.bind(_this2)); // wait until processing is complete
       }
 
       if (_this2._onStop) {
@@ -136,6 +139,10 @@ class MongoCron {
     return _asyncToGenerator(function* () {
       if (!_this3._isRunning) return;
 
+      yield (0, _es6Sleep.promise)(_this3._nextDelay);
+
+      if (!_this3._isRunning) return;
+
       _this3._isProcessing = true;
       try {
         yield _this3._tick();
@@ -147,8 +154,6 @@ class MongoCron {
         }
       }
       _this3._isProcessing = false;
-
-      yield (0, _es6Sleep.promise)(_this3._nextDelay);
 
       process.nextTick(_this3._loop.bind(_this3));
     })();
@@ -162,7 +167,7 @@ class MongoCron {
     var _this4 = this;
 
     return _asyncToGenerator(function* () {
-      let doc = yield _this4._lockNextDocument();
+      let doc = yield _this4.lockNext();
 
       if (!doc) {
         // no documents to process (idle state)
@@ -173,16 +178,15 @@ class MongoCron {
         yield _this4._onDocument.call(_this4, doc, _this4);
       }
 
-      yield _this4._rescheduleDocument(doc);
+      yield _this4._reschedule(doc);
     })();
   }
 
   /*
-  * A private method which prepares the next document for processing
-  * and returns its updated version.
+  * Locks the next job document for processing and returns it.
   */
 
-  _lockNextDocument() {
+  lockNext() {
     var _this5 = this;
 
     return _asyncToGenerator(function* () {
@@ -191,6 +195,8 @@ class MongoCron {
 
       let res = yield _this5._collection.findOneAndUpdate({
         $and: [{
+          $or: [{ [_this5._namespaceFieldPath]: { $in: _this5._watchedNamespaces } }, { [_this5._namespaceFieldPath]: { $exists: false } }]
+        }, {
           [_this5._processableFieldPath]: true
         }, {
           $or: [{ [_this5._lockUntilFieldPath]: { $lte: currentDate } }, { [_this5._lockUntilFieldPath]: { $exists: false } }]
@@ -210,11 +216,11 @@ class MongoCron {
   }
 
   /*
-  * Returns the next date when the document can be processed or `null` if the
-  * job is expired or not recurring.
+  * Returns the next date when a job document can be processed or `null` if the
+  * job has expired.
   */
 
-  getNextStart(doc) {
+  _getNextStart(doc) {
     if (!_dotObject2.default.pick(this._intervalFieldPath, doc)) {
       // not recurring job
       return null;
@@ -239,15 +245,15 @@ class MongoCron {
   }
 
   /*
-  * Private method which tries to reschedule a document, marks it as expired or
-  * deletes a job if `autoRemove` is set to `true`.
+  * Tries to reschedule a job document, to mark it as expired or to delete a job
+  * if `autoRemove` is set to `true`.
   */
 
-  _rescheduleDocument(doc) {
+  _reschedule(doc) {
     var _this6 = this;
 
     return _asyncToGenerator(function* () {
-      let nextStart = _this6.getNextStart(doc);
+      let nextStart = _this6._getNextStart(doc);
       let _id = (0, _mongodb.ObjectId)(doc._id);
 
       if (!nextStart && _dotObject2.default.pick(_this6._autoRemoveFieldPath, doc)) {

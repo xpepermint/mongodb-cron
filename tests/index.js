@@ -1,6 +1,6 @@
-const test = require('ava');
-const cron = require('../dist');
+import test from 'ava';
+import {MongoCron} from '../dist';
 
 test('exposed content', (t) => {
-  t.is(!!cron.MongoCron, true);
+  t.is(!!MongoCron, true);
 });

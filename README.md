@@ -14,11 +14,11 @@ This package offers a simple API for scheduling tasks and running recurring jobs
 $ npm install --save ioredis mongodb mongodb-cron
 ```
 
-## Jobs
+## Enqueuing Jobs
 
 Jobs are documents that live in a MongoDB collection. The `MongoCron` class can convert any collection into a job queue.
 
-### Example
+## Example
 
 Below, is a simple example to show the benefit of using this package in your Node.js projects. To make things as clean as possible, we use [Babel](https://babeljs.io/) with ES7 features, thus we can wrap our code into the async block.
 
@@ -41,7 +41,7 @@ Continue by initializing and starting a collection worker.
 ```js
 import {MongoCron} from 'mongodb-cron';
 
-let collection = db.collection('events');
+let collection = db.collection('jobs');
 let cron = new MongoCron({
   collection,
   onDocument: async (doc, cron) => console.log(doc),
@@ -54,7 +54,7 @@ cron.start(); // start processing
 We can now create our first job.
 
 ```js
-cron.collection.insert({
+let job = await collection.insert({
   name: 'Ricky Martin Show',
   processable: true
 });
@@ -62,12 +62,12 @@ cron.collection.insert({
 
 After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how a collection becomes a job queue. We have a very basic example here so read next sections for advanced features.
 
-### One-time Tasks
+### One-time Jobs
 
 For creating a one-time job we only need to set the `processable` field to `true`. This will immediately trigger the processing of a document.
 
 ```js
-cron.collection.insert({
+let job = await collection.insert({
   ...
   processable: true
 });
@@ -82,7 +82,7 @@ When the processing ends, the `processable` and `lockUntil` fields are removed. 
 Job execution can be delayed by setting the `waitUntil` field.
 
 ```js
-cron.collection.insert({
+let job = await collection.insert({
   ...
   waitUntil: new Date('2016-01-01')
 });
@@ -93,7 +93,7 @@ cron.collection.insert({
 By setting the `interval` field we define a recurring job.
 
 ```js
-cron.collection.insert({
+let job = await collection.insert({
   ...
   interval: '* * * * * *' // every second
 });
@@ -115,20 +115,99 @@ The interval above consists of 6 values.
 A recurring job will repeat endlessly unless we limit that by setting the `repeatUntil` field. When a job expires it stops repeating by removing the `processable` field.
 
 ```js
-cron.collection.insert({
+let job = await collection.insert({
   ...
   interval: '* * * * * *',
   repeatUntil: new Date('2020-01-01')
 });
 ```
 
-### Remove When Completed
+### Auto-removable Jobs
 
-A job can automatically remove itself from the database collection when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
+A job can automatically remove itself from the database when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
+
+```js
+let job = await collection.insert({
+  ...
+  autoRemove: true
+});
+```
+
+### Processing Pools
+
+A job can have a namespace. A namespace represents a name of a processing pool or better a work group to which a job belongs to. By default a worker processes all documents in a collection, regardless the value of a `namespace` field. We can limit the processing to only selected namespaces by setting the `watchedNamespaces` field. Note that jobs without the namespace are always included in the list.
+
+```js
+let cron = new MongoCron({
+  ...
+  watchedNamespaces: ['us', 'eu'] // process only documents where namespace field equals to us or   
+});
+
+let job = await collection.insert({
+  ...
+  namespace: 'us' // processing pool name
+});
+```
+
+### Namespace Locking (to-do)
+
+A worker can lock a particular namespace. This means that other workers or cluster processes are not allowed to process jobs of that namespace until the namespace lock is released.
+
+This feature requires a [Redis](redis.io) connection (we use [ioredis](https://github.com/luin/ioredis) but any other package with the support for Promises can be used).
+
+There are two types of locking strategy - `local` and `global`.
+
+#### Local Lock
+
+Local namespace lock prevents multiple processes in a node cluster to process the same namespace at the same time.
+
+```js
+import Redis from 'ioredis';
+
+let job = await collection.insert({
+  ...
+  redis: new Redis(), // required
+  namespaceLocking: 'local'
+});
+```
+
+#### Global Lock
+
+Global namespace lock prevents multiple workers to process the same namespace in the same time.
+
+```js
+import Redis from 'ioredis';
+
+let job = await collection.insert({
+  ...
+  redis: new Redis(), // required
+  namespaceLocking: 'global'
+});
+```
+
+### Using Quota (to-do)
+
+By default a worker tries to process jobs as quickly as possible and never stops. MongoCron supports time based quota. Thus you can set a limit on how many jobs is allowed to be processed in a particular time frame (e.g. 100 jobs per hour).
+
+This feature requires a [Redis](redis.io) connection (we use [ioredis](https://github.com/luin/ioredis) but any other package with the support for Promises can be used).
+
+```js
+import Redis from 'ioredis';
+
+let job = await collection.insert({
+  ...
+  redis: new Redis(), // required
+  minutelyQuota: 10,
+  hourlyQuota: 100,
+  dailyQuota: 1000,
+  weeklyQuota: 5000
+  monthlyQuota: 20000
+});
+```
 
 ### API
 
-**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, processableFieldPath, lockUntilFieldPath, waitUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath})**
+**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, processableFieldPath, lockUntilFieldPath, waitUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, manager})**
 > The core class for converting a MongoDB collection into a job queue.
 
 | Option | Type | Required | Default | Description
@@ -142,17 +221,19 @@ A job can automatically remove itself from the database collection when the proc
 | reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
 | idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
 | lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
+| watchedNamespaces | Array | No | [] | A list of namespaces to watch (jobs without a namespace are watched by default).
+| namespaceFieldPath | String | No | namespace | The `namespace` field path.
 | processableFieldPath | String | No | processing | The `processing` field path.
 | lockUntilFieldPath | String | No | lockUntil | The `lockUntil` field path.
 | waitUntilFieldPath | String | No | waitUntil | The `waitUntil` field path.
 | intervalFieldPath | String | No | interval | The `interval` field path.
 | repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
 | autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
-| pool | MongoCronPool | No | - | Processing pool instance.
+| manager | MongoCronManager | No | - | Manager instance for processing jobs using pools.
 
 ```js
 let cron = new MongoCron({
-  collection: db.collection('events'),
+  collection: db.collection('jobs'),
   onStart: async (cron) => {},
   onStop: async (cron) => {},
   onDocument: async (doc, cron) => {},
@@ -161,13 +242,15 @@ let cron = new MongoCron({
   reprocessDelay: 1000,
   idleDelay: 10000,
   lockDuration: 600000,
+  watchedNamespaces: ['foo'],
+  namespaceFieldPath: 'cron.namespace',
   processableFieldPath: 'cron.processing',
   lockUntilFieldPath: 'cron.lockUntil',
   waitUntilFieldPath: 'cron.waitUntil',
   intervalFieldPath: 'cron.interval',
   repeatUntilFieldPath: 'cron.repeatUntil',
   autoRemoveFieldPath: 'cron.autoRemove',
-  pool: null
+  manager: null
 });
 ```
 
@@ -177,122 +260,25 @@ let cron = new MongoCron({
 **cron.stop()**:Promise
 > Stops the cron processor.
 
-**cron.getNextStart(doc)**:Date
-> Calculates and returns the next available start date for the provided document.
-
-| Option | Type | Required | Default | Description
-|--------|------|----------|---------|------------
-| doc | Object | Yes | - | Collection's document.
-
 **cron.isRunning**:Boolean
 > Returns true if the cron is started.
 
 **cron.isProcessing**:Boolean
 > Returns true if cron is processing a document.
 
-**cron.collection**:Object
-> Returns MongoDB collection which is used by this class.
+**cron.lockNext**:Document
+> Locks the next job document for processing and returns it.
 
 ### Processing Speed
 
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 
 ```js
-cron.collection.createIndex({
+await collection.createIndex({
+  namespace: 1,
   processable: 1,
   lockUntil: 1,
   waitUntil: 1
-}, {
-  sparse: true
-});
-```
-
-## Pools
-
-We can organize our jobs into isolated processing pools and let certain workers handle only the specific namespaces. Each pool can be configured to process associated jobs in a different way (e.g. custom processing speed). Pools also support [Redis](http://redis.io)-backed processing quotas, thus we can limit the number of actions based on a time frame (e.g. process max 100 jobs per day).
-
-Pools live in a dedicated MongoDB collection. Each document represent an isolated processing pool, holding custom configuration settings.
-
-Polls change the way cron workers process jobs. Cron will first find and lock the most appropriated pool, then it will continue by processing associated jobs until the associated jobs exist or until pool's quota is reached.
-
-### Example
-
-Let start by creating and configuring the `MongoCronPool` class instance.
-
-```js
-import Redis from 'ioredis';
-import {MongoCronPool} from 'mongodb-cron';
-
-let redis = new Redis();
-
-let pool = new MongoCronPool({
-  redis,
-  collection: db.collection('pools')
-});
-```
-
-Continue by upgrading our previous example.
-
-```js
-let cron = new MongoCron({
-  ...
-  pool
-});
-```
-
-Create a new pool document.
-
-```js
-pool.collection.insert({
-  maxPerHour: 100
-});
-```
-
-When enqueuing jobs, we now need to provide the associated `poolId`.
-
-```js
-cron.collection.insert({
-  _poolId: ObjectId(pool._id),
-  name: 'Ricky Martin Show',
-  processable: true
-});
-```
-
-Cron will now process jobs through the provided pool instance.
-
-### API
-
-**new MongoCronPool({collection, nextDelay, reprocessDelay, idleDelay, lockDuration, processableFieldPath})**
-> The core class for converting a MongoDB collection into a job queue.
-
-| Option | Type | Required | Default | Description
-|--------|------|----------|---------|------------
-| redis | Object | Yes | - | Redis connection instance.
-| collection | Object | Yes | - | MongoDB collection object.
-| nextDelay | Integer | No | 0 | A variable which tells how fast the next job can be processed.
-| reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
-| idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
-| lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
-| processableFieldPath | String | No | processing | The `processing` field path.
-| maxPerMinute | Integer | No | 0 | The maximum number or processed jobs per minute (set 0 for unlimited).
-| maxPerHour | Integer | No | 0 | The maximum number or processed jobs per hour (set 0 for unlimited).
-| maxPerDay | Integer | No | 0 | The maximum number or processed jobs per day (set 0 for unlimited).
-| maxPerWeek | Integer | No | 0 | The maximum number or processed jobs per week (set 0 for unlimited).
-| maxPerMonth | Integer | No | 0 | The maximum number or processed jobs per month (set 0 for unlimited).
-
-```js
-let pool = new MongoCronPool({
-  redis,
-  collection: db.collection('pools'),
-  nextDelay: 1000,
-  reprocessDelay: 1000,
-  idleDelay: 10000,
-  lockDuration: 600000,
-  maxPerMinute: 10,
-  maxPerHour: 100,
-  maxPerDay: 1000,
-  maxPerWeek: 10000,
-  maxPerMonth: 100000
 });
 ```
 
