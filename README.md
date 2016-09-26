@@ -14,11 +14,9 @@ This package offers a simple API for scheduling tasks and running recurring jobs
 $ npm install --save ioredis mongodb mongodb-cron
 ```
 
-## Enqueuing Jobs
+## Example
 
 Jobs are documents that live in a MongoDB collection. The `MongoCron` class can convert any collection into a job queue.
-
-## Example
 
 Below, is a simple example to show the benefit of using this package in your Node.js projects. To make things as clean as possible, we use [Babel](https://babeljs.io/) with ES7 features, thus we can wrap our code into the async block.
 
@@ -62,7 +60,7 @@ let job = await collection.insert({
 
 After inserting the document above to the database, the `onDocument` callback, which we've defined earlier, will immediately be triggered. This is how a collection becomes a job queue. We have a very basic example here so read next sections for advanced features.
 
-### One-time Jobs
+## One-time Jobs
 
 For creating a one-time job we only need to set the `processable` field to `true`. This will immediately trigger the processing of a document.
 
@@ -77,7 +75,7 @@ When the processing of a document starts the `lockUntil` field is set which lock
 
 When the processing ends, the `processable` and `lockUntil` fields are removed. If the processing is interrupted (e.g. server shutdown), the `lockUntil` field may stay on the document but has no effect as soon as its value becomes the past thus the system will automatically recover and transparently continue.
 
-### Deferred Execution
+## Deferred Execution
 
 Job execution can be delayed by setting the `waitUntil` field.
 
@@ -88,7 +86,7 @@ let job = await collection.insert({
 });
 ```
 
-### Recurring Jobs
+## Recurring Jobs
 
 By setting the `interval` field we define a recurring job.
 
@@ -122,7 +120,7 @@ let job = await collection.insert({
 });
 ```
 
-### Auto-removable Jobs
+## Auto-removable Jobs
 
 A job can automatically remove itself from the database when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
 
@@ -133,7 +131,7 @@ let job = await collection.insert({
 });
 ```
 
-### Processing Pools
+## Processing Pools
 
 A job can have a namespace. A namespace represents a name of a processing pool or better a work group to which a job belongs to. By default a worker processes all documents in a collection, regardless the value of a `namespace` field. We can limit the processing to only selected namespaces by setting the `watchedNamespaces` field. Note that jobs without the namespace are always included in the list.
 
@@ -149,43 +147,25 @@ let job = await collection.insert({
 });
 ```
 
-### Namespace Locking (to-do)
+## Namespace Dedication
 
-A worker can lock a particular namespace. This means that other workers or cluster processes are not allowed to process jobs of that namespace until the namespace lock is released.
+A worker can lock a particular namespace. This means that other workers or cluster processes are not allowed to process jobs of that namespace in that time until the namespace lock expires or is released by the worker itself.
+
+When a namespace is locked a worker becomes an owner of this namespace. In this case a worker will only process jobs of the namespace which he owns until there are jobs with that namespace available in a database collection. When all jobs of that namespace are processed, the namespace is released and a worker restarts by locking the next available namespace.
 
 This feature requires a [Redis](redis.io) connection (we use [ioredis](https://github.com/luin/ioredis) but any other package with the support for Promises can be used).
 
-There are two types of locking strategy - `local` and `global`.
-
-#### Local Lock
-
-Local namespace lock prevents multiple processes in a node cluster to process the same namespace at the same time.
-
 ```js
 import Redis from 'ioredis';
 
 let job = await collection.insert({
   ...
   redis: new Redis(), // required
-  namespaceLocking: 'local'
+  namespaceDedication: true
 });
 ```
 
-#### Global Lock
-
-Global namespace lock prevents multiple workers to process the same namespace in the same time.
-
-```js
-import Redis from 'ioredis';
-
-let job = await collection.insert({
-  ...
-  redis: new Redis(), // required
-  namespaceLocking: 'global'
-});
-```
-
-### Using Quota (to-do)
+## Using Quota (to-do)
 
 By default a worker tries to process jobs as quickly as possible and never stops. MongoCron supports time based quota. Thus you can set a limit on how many jobs is allowed to be processed in a particular time frame (e.g. 100 jobs per hour).
 
@@ -205,7 +185,7 @@ let job = await collection.insert({
 });
 ```
 
-### API
+## API
 
 **new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, processableFieldPath, lockUntilFieldPath, waitUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, manager})**
 > The core class for converting a MongoDB collection into a job queue.
@@ -213,6 +193,7 @@ let job = await collection.insert({
 | Option | Type | Required | Default | Description
 |--------|------|----------|---------|------------
 | collection | Object | Yes | - | MongoDB collection object.
+| redis | Object | Yes, for some features | - | Redis class instance.
 | onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
 | onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
 | onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
@@ -222,6 +203,7 @@ let job = await collection.insert({
 | idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
 | lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
 | watchedNamespaces | Array | No | [] | A list of namespaces to watch (jobs without a namespace are watched by default).
+| namespaceDedication | Boolean | No | false | Locks namespace before processing starts so other workers or node cluster processes can't process the same namespace, then it processes only that locked namespace until jobs for this namespace are available.
 | namespaceFieldPath | String | No | namespace | The `namespace` field path.
 | processableFieldPath | String | No | processing | The `processing` field path.
 | lockUntilFieldPath | String | No | lockUntil | The `lockUntil` field path.
@@ -269,7 +251,7 @@ let cron = new MongoCron({
 **cron.lockNext**:Document
 > Locks the next job document for processing and returns it.
 
-### Processing Speed
+## Processing Speed
 
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 

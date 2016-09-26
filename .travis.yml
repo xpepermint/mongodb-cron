@@ -4,3 +4,4 @@ node_js:
   - "5"
 services:
   - mongodb
+  - redis-server

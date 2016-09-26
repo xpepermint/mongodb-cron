@@ -17,20 +17,22 @@ export class MongoCron {
   constructor(options={}) {
     this._isRunning = false;
     this._isProcessing = false;
+    this._isIdle = false;
 
     this._collection = options.collection;
+    this._redis = options.redis;
 
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
     this._onStop = options.onStop;
-    this._onError = options.onError;
+    this._onError = options.onError || console.error;
 
     this._nextDelay = options.nextDelay || 0; // wait before processing next job
     this._reprocessDelay = options.reprocessDelay || 0; // wait before processing the same job again
     this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
     this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
-
-    this._watchedNamespaces = options.watchedNamespaces || [];
+    this._watchedNamespaces = options.watchedNamespaces;
+    this._namespaceDedication = options.namespaceDedication || false;
 
     this._namespaceFieldPath = options.namespaceFieldPath || 'namespace';
     this._processableFieldPath = options.processableFieldPath || 'processable';
@@ -58,11 +60,27 @@ export class MongoCron {
   }
 
   /*
+  * Returns true if the cron is in idle state.
+  */
+
+  get isIdle() {
+    return this._isIdle;
+  }
+
+  /*
   * Returns the MongoDB collection.
   */
 
   get collection() {
     return this._collection;
+  }
+
+  /*
+  * Returns the Redis instance.
+  */
+
+  get redis() {
+    return this._redis;
   }
 
   /*
@@ -77,7 +95,7 @@ export class MongoCron {
         await this._onStart.call(this, this);
       }
 
-      process.nextTick(this._loop.bind(this));
+      process.nextTick(this._tick.bind(this));
     }
   }
 
@@ -88,7 +106,7 @@ export class MongoCron {
   async stop() {
     this._isRunning = false;
 
-    if (this._isProcessing) {
+    if (this._isProcessing || this._isIdle) {
       await sleep(300);
       return process.nextTick(this.stop.bind(this)); // wait until processing is complete
     }
@@ -99,64 +117,142 @@ export class MongoCron {
   }
 
   /*
-  * Private method which starts the heartbit loop.
+  * Private method which runs the heartbit tick.
   */
 
-  async _loop() {
+  async _tick(namespace) {
     if (!this._isRunning) return;
-
     await sleep(this._nextDelay);
-
     if (!this._isRunning) return;
 
     this._isProcessing = true;
     try {
-      await this._tick();
-    } catch(e) {
-      if (this._onError) {
-        await this._onError.call(this, e, this);
-      } else {
-        console.log(e);
+      if (this._namespaceDedication && typeof namespace === 'undefined') { // managing namespace
+        namespace = await this._lockNamespace();
       }
+
+      let doc = await this._lockJob(namespace); // locking next job
+      if (!doc) {
+        if (namespace) { // processing for this namespace ended
+          await this._unlockNamespace(namespace);
+        } else if (namespace === null) { // all namespaces (including the null) have been processed
+          this._isIdle = true;
+          await sleep(this._idleDelay);
+          this._isIdle = false;
+        }
+        namespace = undefined; // no documents left, find new namespace
+      } else {
+        if (this._onDocument) {
+          await this._onDocument.call(this, doc, this);
+        }
+        await this._reschedule(doc);
+      }
+    } catch(e) {
+      await this._onError.call(this, e, this);
     }
     this._isProcessing = false;
 
-    process.nextTick(this._loop.bind(this));
+    // run next heartbit tick
+    process.nextTick(() => this._tick(namespace));
   }
 
   /*
-  * Private method which handles heartbit's tick.
+  * Locks the next namespace for processing and returns it.
   */
 
-  async _tick() {
-    let doc = await this.lockNext();
+  async _lockNamespace() {
+    let currentDate = moment().toDate();
 
-    if (!doc) { // no documents to process (idle state)
-      return await sleep(this._idleDelay);
+    let namespaceFilter = this._watchedNamespaces
+      ? {$in: this._watchedNamespaces}
+      : {$exists: true};
+
+    let cursor = await this._collection.aggregate([
+      {
+        $match: {
+          $and: [
+            {
+              [this._namespaceFieldPath]: namespaceFilter
+            },
+            {
+              [this._processableFieldPath]: true
+            },
+            {
+              $or: [
+                {[this._lockUntilFieldPath]: {$lte: currentDate}},
+                {[this._lockUntilFieldPath]: {$exists: false}}
+              ]
+            },
+            {
+              $or: [
+                {[this._waitUntilFieldPath]: {$lte: currentDate}},
+                {[this._waitUntilFieldPath]: {$exists: false}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: `$${this._namespaceFieldPath}`,
+          maxLockUntil: {$max: `$${this._lockUntilFieldPath}`}
+        }
+      },
+      {
+        $match: {
+          $or: [
+            {maxLockUntil: null},
+            {maxLockUntil: {$lte: currentDate}}
+          ]
+        }
+      }
+    ]).batchSize(1);
+
+    let namespace = null;
+    do {
+      let doc = await cursor.nextObject();
+      if (!doc) {
+        break;
+      }
+      let res = await this._redis.set(doc._id, '0', 'PX', this._lockDuration, 'NX');
+      if (res === 'OK') {
+        namespace = doc._id;
+        break;
+      }
+    } while(true);
+
+    await cursor.close();
+
+    return namespace;
+  }
+
+  /*
+  * Unlocks the namespace.
+  */
+
+  async _unlockNamespace(namespace) {
+    if (namespace) {
+      await this._redis.del(namespace);
     }
-
-    if (this._onDocument) {
-      await this._onDocument.call(this, doc, this);
-    }
-
-    await this._reschedule(doc);
   }
 
   /*
   * Locks the next job document for processing and returns it.
   */
 
-  async lockNext() {
+  async _lockJob(namespace) {
     let lockUntil = moment().add(this._lockDuration, 'millisecond').toDate();
     let currentDate = moment().toDate();
+
+    let namespaceFilters = namespace
+      ? [ {[this._namespaceFieldPath]: namespace}]
+      : [ {[this._namespaceFieldPath]: {$in: this._watchedNamespaces || []}},
+          {[this._namespaceFieldPath]: {$exists: false}}];
 
     let res = await this._collection.findOneAndUpdate({
       $and: [
         {
-          $or: [
-            {[this._namespaceFieldPath]: {$in: this._watchedNamespaces}},
-            {[this._namespaceFieldPath]: {$exists: false}}
-          ]
+          $or: namespaceFilters
         },
         {
           [this._processableFieldPath]: true
