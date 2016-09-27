@@ -5,7 +5,6 @@ node_js:
   - "5"
 services:
   - mongodb
-  - redis-server
 addons:
   apt:
     sources:
