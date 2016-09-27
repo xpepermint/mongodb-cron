@@ -35,9 +35,7 @@ export class MongoCron {
     this._namespaceDedication = options.namespaceDedication || false;
 
     this._namespaceFieldPath = options.namespaceFieldPath || 'namespace';
-    this._processableFieldPath = options.processableFieldPath || 'processable';
-    this._lockUntilFieldPath = options.lockUntilFieldPath || 'lockUntil';
-    this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
+    this._sleepUntilFieldPath = options.sleepUntilFieldPath || 'sleepUntil';
     this._intervalFieldPath = options.intervalFieldPath || 'interval';
     this._repeatUntilFieldPath = options.repeatUntilFieldPath || 'repeatUntil';
     this._autoRemoveFieldPath = options.autoRemoveFieldPath || 'autoRemove';
@@ -81,6 +79,21 @@ export class MongoCron {
 
   get redis() {
     return this._redis;
+  }
+
+  /*
+  * Creates required collection indexes.
+  */
+
+  async setup() {
+    await this._collection.createIndex({
+      [this._sleepUntilFieldPath]: 1
+    }, {sparse: true});
+
+    await this._collection.createIndex({
+      [this._namespaceFieldPath]: 1,
+      [this._sleepUntilFieldPath]: 1
+    }, {sparse: true});
   }
 
   /*
@@ -163,47 +176,32 @@ export class MongoCron {
   async _lockNamespace() {
     let currentDate = moment().toDate();
 
-    let namespaceFilter = this._watchedNamespaces
-      ? {$in: this._watchedNamespaces}
-      : {$exists: true};
+    let filters = [];
+    if (this._watchedNamespaces) {
+      filters.push(
+        {[this._namespaceFieldPath]: {$exists: true}},
+        {[this._namespaceFieldPath]: {$in: this._watchedNamespaces}}
+      );
+    }
+    filters.push(
+      {[this._sleepUntilFieldPath]: {$exists: true}},
+    );
 
     let cursor = await this._collection.aggregate([
       {
         $match: {
-          $and: [
-            {
-              [this._namespaceFieldPath]: namespaceFilter
-            },
-            {
-              [this._processableFieldPath]: true
-            },
-            {
-              $or: [
-                {[this._lockUntilFieldPath]: {$lte: currentDate}},
-                {[this._lockUntilFieldPath]: {$exists: false}}
-              ]
-            },
-            {
-              $or: [
-                {[this._waitUntilFieldPath]: {$lte: currentDate}},
-                {[this._waitUntilFieldPath]: {$exists: false}}
-              ]
-            }
-          ]
+          $and: filters
         }
       },
       {
         $group: {
           _id: `$${this._namespaceFieldPath}`,
-          maxLockUntil: {$max: `$${this._lockUntilFieldPath}`}
+          maxLockUntil: {$max: `$${this._sleepUntilFieldPath}`}
         }
       },
       {
         $match: {
-          $or: [
-            {maxLockUntil: null},
-            {maxLockUntil: {$lte: currentDate}}
-          ]
+          maxLockUntil: {$not: {$gt: currentDate}}
         }
       }
     ]).batchSize(1);
@@ -241,41 +239,34 @@ export class MongoCron {
   */
 
   async _lockJob(namespace) {
-    let lockUntil = moment().add(this._lockDuration, 'millisecond').toDate();
+    let sleepUntil = moment().add(this._lockDuration, 'millisecond').toDate();
     let currentDate = moment().toDate();
 
-    let namespaceFilters = namespace
-      ? [ {[this._namespaceFieldPath]: namespace}]
-      : [ {[this._namespaceFieldPath]: {$in: this._watchedNamespaces || []}},
-          {[this._namespaceFieldPath]: {$exists: false}}];
+    let filters = [];
+    if (typeof namespace !== 'undefined') {
+      filters.push(
+        {[this._namespaceFieldPath]: {$exists: true}},
+        {[this._namespaceFieldPath]: namespace}
+      );
+    } else if (this._watchedNamespaces) {
+      filters.push(
+        {[this._namespaceFieldPath]: {$exists: true}},
+        {[this._namespaceFieldPath]: {$in: this._watchedNamespaces}}
+      );
+    }
+    filters.push(
+      {[this._sleepUntilFieldPath]: {$exists: true}},
+      {[this._sleepUntilFieldPath]: {$not: {$gt: currentDate}}}
+    );
 
     let res = await this._collection.findOneAndUpdate({
-      $and: [
-        {
-          $or: namespaceFilters
-        },
-        {
-          [this._processableFieldPath]: true
-        },
-        {
-          $or: [
-            {[this._lockUntilFieldPath]: {$lte: currentDate}},
-            {[this._lockUntilFieldPath]: {$exists: false}}
-          ]
-        },
-        {
-          $or: [
-            {[this._waitUntilFieldPath]: {$lte: currentDate}},
-            {[this._waitUntilFieldPath]: {$exists: false}}
-          ]
-        }
-      ]
+      $and: filters
     }, {
       $set: {
-        [this._lockUntilFieldPath]: lockUntil
+        [this._sleepUntilFieldPath]: sleepUntil
       }
     }, {
-      sort: {[this._waitUntilFieldPath]: 1},
+      sort: {[this._sleepUntilFieldPath]: 1},
       returnOriginal: false
     });
     return res.value;
@@ -291,7 +282,7 @@ export class MongoCron {
       return null;
     }
 
-    let start = moment(dot.pick(this._waitUntilFieldPath, doc));
+    let start = moment(dot.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
     let future = moment().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
@@ -319,20 +310,15 @@ export class MongoCron {
     if (!nextStart && dot.pick(this._autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this._collection.deleteOne({_id});
     } else if (!nextStart) { // stop execution
-      await this._collection.updateOne({_id}, {
+      let res = await this._collection.updateOne({_id}, {
         $unset: {
-          [this._processableFieldPath]: 1,
-          [this._lockUntilFieldPath]: 1,
-          [this._waitUntilFieldPath]: 1
+          [this._sleepUntilFieldPath]: 1
         }
       });
     } else { // reschedule for reprocessing in the future (recurring)
       await this._collection.updateOne({_id}, {
-        $unset: {
-          [this._lockUntilFieldPath]: 1,
-        },
         $set: {
-          [this._waitUntilFieldPath]: nextStart
+          [this._sleepUntilFieldPath]: nextStart
         }
       });
     }

@@ -1,3 +1,4 @@
+sudo: false
 language: node_js
 node_js:
   - "6"
@@ -5,3 +6,9 @@ node_js:
 services:
   - mongodb
   - redis-server
+addons:
+  apt:
+    sources:
+    - mongodb-3.2-precise
+    packages:
+    - mongodb-org-server

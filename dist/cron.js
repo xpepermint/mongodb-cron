@@ -58,9 +58,7 @@ class MongoCron {
     this._namespaceDedication = options.namespaceDedication || false;
 
     this._namespaceFieldPath = options.namespaceFieldPath || 'namespace';
-    this._processableFieldPath = options.processableFieldPath || 'processable';
-    this._lockUntilFieldPath = options.lockUntilFieldPath || 'lockUntil';
-    this._waitUntilFieldPath = options.waitUntilFieldPath || 'waitUntil';
+    this._sleepUntilFieldPath = options.sleepUntilFieldPath || 'sleepUntil';
     this._intervalFieldPath = options.intervalFieldPath || 'interval';
     this._repeatUntilFieldPath = options.repeatUntilFieldPath || 'repeatUntil';
     this._autoRemoveFieldPath = options.autoRemoveFieldPath || 'autoRemove';
@@ -107,21 +105,40 @@ class MongoCron {
   }
 
   /*
+  * Creates required collection indexes.
+  */
+
+  setup() {
+    var _this = this;
+
+    return _asyncToGenerator(function* () {
+      yield _this._collection.createIndex({
+        [_this._sleepUntilFieldPath]: 1
+      }, { sparse: true });
+
+      yield _this._collection.createIndex({
+        [_this._namespaceFieldPath]: 1,
+        [_this._sleepUntilFieldPath]: 1
+      }, { sparse: true });
+    })();
+  }
+
+  /*
   * Starts the heartbit.
   */
 
   start() {
-    var _this = this;
+    var _this2 = this;
 
     return _asyncToGenerator(function* () {
-      if (!_this._isRunning) {
-        _this._isRunning = true;
+      if (!_this2._isRunning) {
+        _this2._isRunning = true;
 
-        if (_this._onStart) {
-          yield _this._onStart.call(_this, _this);
+        if (_this2._onStart) {
+          yield _this2._onStart.call(_this2, _this2);
         }
 
-        process.nextTick(_this._tick.bind(_this));
+        process.nextTick(_this2._tick.bind(_this2));
       }
     })();
   }
@@ -131,18 +148,18 @@ class MongoCron {
   */
 
   stop() {
-    var _this2 = this;
+    var _this3 = this;
 
     return _asyncToGenerator(function* () {
-      _this2._isRunning = false;
+      _this3._isRunning = false;
 
-      if (_this2._isProcessing || _this2._isIdle) {
+      if (_this3._isProcessing || _this3._isIdle) {
         yield (0, _es6Sleep.promise)(300);
-        return process.nextTick(_this2.stop.bind(_this2)); // wait until processing is complete
+        return process.nextTick(_this3.stop.bind(_this3)); // wait until processing is complete
       }
 
-      if (_this2._onStop) {
-        yield _this2._onStop.call(_this2, _this2);
+      if (_this3._onStop) {
+        yield _this3._onStop.call(_this3, _this3);
       }
     })();
   }
@@ -152,46 +169,46 @@ class MongoCron {
   */
 
   _tick(namespace) {
-    var _this3 = this;
+    var _this4 = this;
 
     return _asyncToGenerator(function* () {
-      if (!_this3._isRunning) return;
-      yield (0, _es6Sleep.promise)(_this3._nextDelay);
-      if (!_this3._isRunning) return;
+      if (!_this4._isRunning) return;
+      yield (0, _es6Sleep.promise)(_this4._nextDelay);
+      if (!_this4._isRunning) return;
 
-      _this3._isProcessing = true;
+      _this4._isProcessing = true;
       try {
-        if (_this3._namespaceDedication && typeof namespace === 'undefined') {
+        if (_this4._namespaceDedication && typeof namespace === 'undefined') {
           // managing namespace
-          namespace = yield _this3._lockNamespace();
+          namespace = yield _this4._lockNamespace();
         }
 
-        let doc = yield _this3._lockJob(namespace); // locking next job
+        let doc = yield _this4._lockJob(namespace); // locking next job
         if (!doc) {
           if (namespace) {
             // processing for this namespace ended
-            yield _this3._unlockNamespace(namespace);
+            yield _this4._unlockNamespace(namespace);
           } else if (namespace === null) {
             // all namespaces (including the null) have been processed
-            _this3._isIdle = true;
-            yield (0, _es6Sleep.promise)(_this3._idleDelay);
-            _this3._isIdle = false;
+            _this4._isIdle = true;
+            yield (0, _es6Sleep.promise)(_this4._idleDelay);
+            _this4._isIdle = false;
           }
           namespace = undefined; // no documents left, find new namespace
         } else {
-          if (_this3._onDocument) {
-            yield _this3._onDocument.call(_this3, doc, _this3);
+          if (_this4._onDocument) {
+            yield _this4._onDocument.call(_this4, doc, _this4);
           }
-          yield _this3._reschedule(doc);
+          yield _this4._reschedule(doc);
         }
       } catch (e) {
-        yield _this3._onError.call(_this3, e, _this3);
+        yield _this4._onError.call(_this4, e, _this4);
       }
-      _this3._isProcessing = false;
+      _this4._isProcessing = false;
 
       // run next heartbit tick
       process.nextTick(function () {
-        return _this3._tick(namespace);
+        return _this4._tick(namespace);
       });
     })();
   }
@@ -201,33 +218,29 @@ class MongoCron {
   */
 
   _lockNamespace() {
-    var _this4 = this;
+    var _this5 = this;
 
     return _asyncToGenerator(function* () {
       let currentDate = (0, _moment2.default)().toDate();
 
-      let namespaceFilter = _this4._watchedNamespaces ? { $in: _this4._watchedNamespaces } : { $exists: true };
+      let filters = [];
+      if (_this5._watchedNamespaces) {
+        filters.push({ [_this5._namespaceFieldPath]: { $exists: true } }, { [_this5._namespaceFieldPath]: { $in: _this5._watchedNamespaces } });
+      }
+      filters.push({ [_this5._sleepUntilFieldPath]: { $exists: true } });
 
-      let cursor = yield _this4._collection.aggregate([{
+      let cursor = yield _this5._collection.aggregate([{
         $match: {
-          $and: [{
-            [_this4._namespaceFieldPath]: namespaceFilter
-          }, {
-            [_this4._processableFieldPath]: true
-          }, {
-            $or: [{ [_this4._lockUntilFieldPath]: { $lte: currentDate } }, { [_this4._lockUntilFieldPath]: { $exists: false } }]
-          }, {
-            $or: [{ [_this4._waitUntilFieldPath]: { $lte: currentDate } }, { [_this4._waitUntilFieldPath]: { $exists: false } }]
-          }]
+          $and: filters
         }
       }, {
         $group: {
-          _id: `$${ _this4._namespaceFieldPath }`,
-          maxLockUntil: { $max: `$${ _this4._lockUntilFieldPath }` }
+          _id: `$${ _this5._namespaceFieldPath }`,
+          maxLockUntil: { $max: `$${ _this5._sleepUntilFieldPath }` }
         }
       }, {
         $match: {
-          $or: [{ maxLockUntil: null }, { maxLockUntil: { $lte: currentDate } }]
+          maxLockUntil: { $not: { $gt: currentDate } }
         }
       }]).batchSize(1);
 
@@ -237,7 +250,7 @@ class MongoCron {
         if (!doc) {
           break;
         }
-        let res = yield _this4._redis.set(doc._id, '0', 'PX', _this4._lockDuration, 'NX');
+        let res = yield _this5._redis.set(doc._id, '0', 'PX', _this5._lockDuration, 'NX');
         if (res === 'OK') {
           namespace = doc._id;
           break;
@@ -255,11 +268,11 @@ class MongoCron {
   */
 
   _unlockNamespace(namespace) {
-    var _this5 = this;
+    var _this6 = this;
 
     return _asyncToGenerator(function* () {
       if (namespace) {
-        yield _this5._redis.del(namespace);
+        yield _this6._redis.del(namespace);
       }
     })();
   }
@@ -269,30 +282,28 @@ class MongoCron {
   */
 
   _lockJob(namespace) {
-    var _this6 = this;
+    var _this7 = this;
 
     return _asyncToGenerator(function* () {
-      let lockUntil = (0, _moment2.default)().add(_this6._lockDuration, 'millisecond').toDate();
+      let sleepUntil = (0, _moment2.default)().add(_this7._lockDuration, 'millisecond').toDate();
       let currentDate = (0, _moment2.default)().toDate();
 
-      let namespaceFilters = namespace ? [{ [_this6._namespaceFieldPath]: namespace }] : [{ [_this6._namespaceFieldPath]: { $in: _this6._watchedNamespaces || [] } }, { [_this6._namespaceFieldPath]: { $exists: false } }];
+      let filters = [];
+      if (typeof namespace !== 'undefined') {
+        filters.push({ [_this7._namespaceFieldPath]: { $exists: true } }, { [_this7._namespaceFieldPath]: namespace });
+      } else if (_this7._watchedNamespaces) {
+        filters.push({ [_this7._namespaceFieldPath]: { $exists: true } }, { [_this7._namespaceFieldPath]: { $in: _this7._watchedNamespaces } });
+      }
+      filters.push({ [_this7._sleepUntilFieldPath]: { $exists: true } }, { [_this7._sleepUntilFieldPath]: { $not: { $gt: currentDate } } });
 
-      let res = yield _this6._collection.findOneAndUpdate({
-        $and: [{
-          $or: namespaceFilters
-        }, {
-          [_this6._processableFieldPath]: true
-        }, {
-          $or: [{ [_this6._lockUntilFieldPath]: { $lte: currentDate } }, { [_this6._lockUntilFieldPath]: { $exists: false } }]
-        }, {
-          $or: [{ [_this6._waitUntilFieldPath]: { $lte: currentDate } }, { [_this6._waitUntilFieldPath]: { $exists: false } }]
-        }]
+      let res = yield _this7._collection.findOneAndUpdate({
+        $and: filters
       }, {
         $set: {
-          [_this6._lockUntilFieldPath]: lockUntil
+          [_this7._sleepUntilFieldPath]: sleepUntil
         }
       }, {
-        sort: { [_this6._waitUntilFieldPath]: 1 },
+        sort: { [_this7._sleepUntilFieldPath]: 1 },
         returnOriginal: false
       });
       return res.value;
@@ -310,7 +321,7 @@ class MongoCron {
       return null;
     }
 
-    let start = (0, _moment2.default)(_dotObject2.default.pick(this._waitUntilFieldPath, doc));
+    let start = (0, _moment2.default)(_dotObject2.default.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
     let future = (0, _moment2.default)().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) {
       // already in future
@@ -334,32 +345,27 @@ class MongoCron {
   */
 
   _reschedule(doc) {
-    var _this7 = this;
+    var _this8 = this;
 
     return _asyncToGenerator(function* () {
-      let nextStart = _this7._getNextStart(doc);
+      let nextStart = _this8._getNextStart(doc);
       let _id = (0, _mongodb.ObjectId)(doc._id);
 
-      if (!nextStart && _dotObject2.default.pick(_this7._autoRemoveFieldPath, doc)) {
+      if (!nextStart && _dotObject2.default.pick(_this8._autoRemoveFieldPath, doc)) {
         // remove if auto-removable and not recuring
-        yield _this7._collection.deleteOne({ _id });
+        yield _this8._collection.deleteOne({ _id });
       } else if (!nextStart) {
         // stop execution
-        yield _this7._collection.updateOne({ _id }, {
+        let res = yield _this8._collection.updateOne({ _id }, {
           $unset: {
-            [_this7._processableFieldPath]: 1,
-            [_this7._lockUntilFieldPath]: 1,
-            [_this7._waitUntilFieldPath]: 1
+            [_this8._sleepUntilFieldPath]: 1
           }
         });
       } else {
         // reschedule for reprocessing in the future (recurring)
-        yield _this7._collection.updateOne({ _id }, {
-          $unset: {
-            [_this7._lockUntilFieldPath]: 1
-          },
+        yield _this8._collection.updateOne({ _id }, {
           $set: {
-            [_this7._waitUntilFieldPath]: nextStart
+            [_this8._sleepUntilFieldPath]: nextStart
           }
         });
       }
