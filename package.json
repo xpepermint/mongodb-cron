@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "prebuild": "npm run clean; mkdir -p ./dist",
     "build": "babel ./src --out-dir ./dist --copy-files",
     "example": "babel-node ./example",
-    "speedtest": "babel-node ./speedtest",
+    "example": "babel-node ./example",
     "prepublish": "npm run build",
     "pretest": "npm run build",
     "test": "ava"

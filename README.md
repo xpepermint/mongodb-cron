@@ -4,18 +4,16 @@
 
 > MongoDB collection as crontab
 
-This package offers a simple API for scheduling tasks and running recurring jobs on [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a job queue or crontab list. It uses the officially supported [Node.js driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/).
-
-Beside the general crontab features, the package provides some advanced functionality as are execution speed limiting, quota and job name-spacing. It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions even in cluster environments.
+This package offers a simple API for scheduling tasks and running recurring jobs on [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a job queue or crontab list. It uses the officially supported [Node.js driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions even in cluster environments.
 
 <img src="giphy.gif" />
 
 ## Setup
 
-This is a module for [Node.js](http://nodejs.org/) and can be installed via [npm](https://www.npmjs.com/package/ioredis-quota). The package requires the  [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/) package. Some features also require the [ioredis](https://github.com/luin/ioredis) package.
+This is a module for [Node.js](http://nodejs.org/) and can be installed via [npm](https://www.npmjs.com). The package depends on the  [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/) package.
 
 ```
-$ npm install --save ioredis mongodb mongodb-cron
+$ npm install --save mongodb mongodb-cron
 ```
 
 ## Example
@@ -65,11 +63,11 @@ When the processing starts the `onDocument` handler (defined earlier) is trigger
 
 The `MongoCron` class converts a collection into a job queue. Jobs are represented by the documents stored in a MongoDB collection. When cron is started it loops through the collection and processes available jobs one by one.
 
-Jobs have a required field `sleepUntil` which defines the job start date. Cron processes only the documents where this field exists, other documents are ignored.
+A job should have at least the `sleepUntil` field. Cron processes only documents where this field exists, other documents are ignored.
 
 ### One-time Jobs
 
-To create a one-time job we only need to set the required field `sleepUntil` field to `null`. This will start processing the job immediately.
+To create a one-time job we only need to define the required field `sleepUntil`. When this filed is set to `null`, the processing starts immediately.
 
 ```js
 let job = await collection.insert({
@@ -139,104 +137,35 @@ let job = await collection.insert({
 });
 ```
 
-## Processing Pools
-
-A job can have a namespace. A namespace represents a name of a processing pool or better a work group to which a job belongs to. By default workers process all documents in a collection, regardless the value of a `namespace` field. We can limit the processing to only the selected namespaces by setting the `watchedNamespaces` field.
-
-```js
-let cron = new MongoCron({
-  ...
-  watchedNamespaces: ['us', 'eu'] // process only documents where namespace field equals to us or   
-});
-
-let job = await collection.insert({
-  ...
-  namespace: 'us' // processing pool name
-});
-```
-
-## Namespace Dedication
-
-A worker can lock a particular namespace. This means that other workers or cluster processes are not allowed to process jobs of that namespace until the namespace lock expires or is released by the worker itself.
-
-When this feature is turned on, only jobs containing a namespace field are processed.
-
-When a namespace is locked a worker becomes an owner of this namespace. In this case a worker will continue processing jobs of the namespace which he owns until there are jobs with that namespace available in a database collection. When all jobs of that namespace are processed, the namespace is released and a worker restarts by locking the next available namespace.
-
-This feature requires a [Redis](redis.io) connection (we use [ioredis](https://github.com/luin/ioredis) but any other package with the support for Promises can be used).
-
-```js
-import Redis from 'ioredis';
-
-let job = await collection.insert({
-  ...
-  redis: new Redis(), // required
-  namespaceDedication: true
-});
-```
-
-## Namespace Quota (to-do)
-
-By default a worker tries to process jobs as quickly as possible and never stops. MongoCron supports time based quota which refers to a namespace. Thus you can set a limit on how many jobs per namespace is allowed to be processed in a particular time frame (e.g. 100 jobs per hour).
-
-This feature requires a [Redis](redis.io) connection (we use [ioredis](https://github.com/luin/ioredis) but any other package with the support for Promises can be used).
-
-```js
-import Redis from 'ioredis';
-
-let job = await collection.insert({
-  ...
-  redis: new Redis(), // required
-  minutelyQuota: 10,
-  hourlyQuota: 100,
-  dailyQuota: 1000,
-  weeklyQuota: 5000
-  monthlyQuota: 20000
-});
-```
-
 ## API
 
-**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, minutelyQuota, hourlyQuota, dailyQuota, weeklyQuota, monthlyQuota})**
+**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath})**
 > The core class for converting a MongoDB collection into a job queue.
 
 | Option | Type | Required | Default | Description
 |--------|------|----------|---------|------------
 | collection | Object | Yes | - | MongoDB collection object.
-| redis | Object | Yes, for some features | - | Redis class instance.
 | onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
 | onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
 | onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
+| onIdle | Function/Promise | No | - | A method which is triggered when all jobs in a collection have been processed.
 | onError | Function/Promise | No | - | A method which is triggered in case of an error.
 | nextDelay | Integer | No | 0 | A variable which tells how fast the next job can be processed.
 | reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
 | idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
 | lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
-| watchedNamespaces | Array | No | [] | A list of namespaces to watch (jobs without a namespace are watched by default).
-| namespaceDedication | Boolean | No | false | Locks namespace before processing starts so other workers or node cluster processes can't process the same namespace, then it processes only that locked namespace until jobs for this namespace are available.
-| namespaceFieldPath | String | No | namespace | The `namespace` field path.
 | sleepUntilFieldPath | String | No | sleepUntil | The `sleepUntil` field path.
 | intervalFieldPath | String | No | interval | The `interval` field path.
 | repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
 | autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
-| minutelyQuota | Integer | No | - | The maximum number of allowed jobs per minute (per namespace).
-| hourlyQuota | Integer | No | - | The maximum number of allowed jobs per hour (per namespace).
-| dailyQuota | Integer | No | - | The maximum number of allowed jobs per day (per namespace).
-| weeklyQuota | Integer | No | - | The maximum number of allowed jobs per week (per namespace).
-| monthlyQuota | Integer | No | - | The maximum number of allowed jobs per month (per namespace).
 
 ```js
-import Redis from 'ioredis';
 import {MongoClient} from 'mongodb';
 
 let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
-let collection = mongo.collection('jobs');
-
-let redis = new Redis();
 
 let cron = new MongoCron({
-  collection,
-  redis,
+  collection: mongo.collection('jobs'),
   onStart: async (cron) => {},
   onStop: async (cron) => {},
   onDocument: async (doc, cron) => {},
@@ -245,18 +174,10 @@ let cron = new MongoCron({
   reprocessDelay: 1000,
   idleDelay: 10000,
   lockDuration: 600000,
-  watchedNamespaces: ['foo'],
-  namespaceDedication: true,
-  namespaceFieldPath: 'cron.namespace',
   sleepUntilFieldPath: 'cron.sleepUntil',
   intervalFieldPath: 'cron.interval',
   repeatUntilFieldPath: 'cron.repeatUntil',
-  autoRemoveFieldPath: 'cron.autoRemove',
-  minutelyQuota: 10,
-  hourlyQuota: 100,
-  dailyQuota: 1000,
-  weeklyQuota: 5000
-  monthlyQuota: 20000
+  autoRemoveFieldPath: 'cron.autoRemove'
 });
 ```
 
@@ -283,7 +204,11 @@ let cron = new MongoCron({
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 
 ```js
-await cron.setup();
+await collection.createIndex({
+  sleepUntil: 1 // the `sleepUntil` field path, set by the sleepUntilFieldPath
+}, {
+  sparse: true
+});
 ```
 
 ## Best Practice

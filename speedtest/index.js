@@ -51,56 +51,6 @@ async function testOneTimeJobs(mongo) {
 }
 
 /*
-* TEST: Namespace dedication.
-*/
-
-async function testNamespaceDedication(mongo, redis) {
-  let time = 0;
-  let collection = mongo.collection('jobs');
-
-  try { await collection.drop() } catch(e) {}
-  try { await redis.flushall() } catch(e) {}
-
-  console.log(`> Creating ${SAMPLE_SIZE} documents ...`);
-
-  time = Date.now();
-  let namespace = null;
-  for (let i=0; i < SAMPLE_SIZE; i++) {
-    if (i % 10 === 0) {
-      namespace = ObjectId().toString();
-    }
-    await collection.insert({
-      sleepUntil: null,
-      namespace
-    });
-  }
-  console.log(`> Done (${Date.now() - time}ms)`);
-
-  console.log(`> Processing ...`);
-
-  time = Date.now();
-  await new Promise((resolve, reject) => {
-    let cron = new MongoCron({
-      collection,
-      redis,
-      onError: (err, cron) => console.log(err),
-      onIdle: () => {
-        cron.stop().then(() => {
-          console.log(`> Done (${Date.now() - time}ms)`);
-          resolve();
-        });
-      },
-      nextDelay: 0,
-      reprocessDelay: 0,
-      idleDelay: 0,
-      lockDuration: 600000,
-      namespaceDedication: true
-    });
-    cron.start();
-  });
-}
-
-/*
 * Starts testing.
 */
 
@@ -108,13 +58,7 @@ async function testNamespaceDedication(mongo, redis) {
   let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
   let redis = new Redis();
 
-  console.log(``);
-  console.log(`[TEST] One-time jobs`);
   await testOneTimeJobs(mongo);
-
-  console.log(``);
-  console.log(`[TEST] Namespace dedication`);
-  await testNamespaceDedication(mongo, redis);
 
   await mongo.close();
   await redis.quit();

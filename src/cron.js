@@ -20,7 +20,6 @@ export class MongoCron {
     this._isIdle = false;
 
     this._collection = options.collection;
-    this._redis = options.redis;
 
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
@@ -32,10 +31,7 @@ export class MongoCron {
     this._reprocessDelay = options.reprocessDelay || 0; // wait before processing the same job again
     this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
     this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
-    this._watchedNamespaces = options.watchedNamespaces;
-    this._namespaceDedication = options.namespaceDedication || false;
 
-    this._namespaceFieldPath = options.namespaceFieldPath || 'namespace';
     this._sleepUntilFieldPath = options.sleepUntilFieldPath || 'sleepUntil';
     this._intervalFieldPath = options.intervalFieldPath || 'interval';
     this._repeatUntilFieldPath = options.repeatUntilFieldPath || 'repeatUntil';
@@ -75,29 +71,6 @@ export class MongoCron {
   }
 
   /*
-  * Returns the Redis instance.
-  */
-
-  get redis() {
-    return this._redis;
-  }
-
-  /*
-  * Creates required collection indexes.
-  */
-
-  async setup() {
-    await this._collection.createIndex({
-      [this._sleepUntilFieldPath]: 1
-    }, {sparse: true});
-
-    await this._collection.createIndex({
-      [this._namespaceFieldPath]: 1,
-      [this._sleepUntilFieldPath]: 1
-    }, {sparse: true});
-  }
-
-  /*
   * Starts the heartbit.
   */
 
@@ -134,151 +107,56 @@ export class MongoCron {
   * Private method which runs the heartbit tick.
   */
 
-  async _tick(namespace) {
+  async _tick() {
     if (!this._isRunning) return;
     await sleep(this._nextDelay);
     if (!this._isRunning) return;
 
     this._isProcessing = true;
     try {
-      if (this._namespaceDedication && typeof namespace === 'undefined') { // managing namespace
-        namespace = await this._lockNamespace();
-      }
-
-      let doc = await this._lockJob(namespace); // locking next job
+      let doc = await this._lockNext(); // locking next job
       if (!doc) {
-        if (typeof namespace !== 'undefined') { // processing for this namespace ended
-          await this._unlockNamespace(namespace);
+        this._isProcessing = false;
+        this._isIdle = true;
+        if (this._onIdle) {
+          await this._onIdle.call(this, this);
         }
-
-        if ( // idle state
-          this._namespaceDedication && namespace === null
-          || !this._namespaceDedication
-        ) {
-          this._isIdle = true;
-          if (this._onIdle) {
-            await this._onIdle.call(this, this);
-          }
-          await sleep(this._idleDelay);
-          this._isIdle = false;
-        }
-
-        namespace = undefined; // no documents left, find new namespace
+        await sleep(this._idleDelay);
+        this._isIdle = false;
       } else {
         if (this._onDocument) {
           await this._onDocument.call(this, doc, this);
         }
         await this._reschedule(doc);
+        this._isProcessing = false;
       }
     } catch(e) {
       await this._onError.call(this, e, this);
     }
-    this._isProcessing = false;
 
-    // run next heartbit tick
-    process.nextTick(() => this._tick(namespace));
-  }
-
-  /*
-  * Locks the next namespace for processing and returns it.
-  */
-
-  async _lockNamespace() {
-    let currentDate = moment().toDate();
-
-    let filters = [];
-    if (this._watchedNamespaces) {
-      filters.push(
-        {[this._namespaceFieldPath]: {$exists: true}},
-        {[this._namespaceFieldPath]: {$in: this._watchedNamespaces}}
-      );
-    }
-    filters.push(
-      {[this._sleepUntilFieldPath]: {$exists: true}},
-    );
-
-    let cursor = await this._collection.aggregate([
-      {
-        $match: {
-          $and: filters
-        }
-      },
-      {
-        $group: {
-          _id: `$${this._namespaceFieldPath}`,
-          maxLockUntil: {$max: `$${this._sleepUntilFieldPath}`}
-        }
-      },
-      {
-        $match: {
-          maxLockUntil: {$not: {$gt: currentDate}}
-        }
-      }
-      // IMPORTANT: sorting is not needed here
-    ]).batchSize(1);
-
-    let namespace = null;
-    do {
-      let doc = await cursor.nextObject();
-      if (!doc) {
-        break;
-      }
-      let res = await this._redis.set(doc._id, '0', 'PX', this._lockDuration, 'NX');
-      if (res === 'OK') {
-        namespace = doc._id;
-        break;
-      }
-    } while(true);
-
-    await cursor.close();
-
-    return namespace;
-  }
-
-  /*
-  * Unlocks the namespace.
-  */
-
-  async _unlockNamespace(namespace) {
-    if (namespace) {
-      await this._redis.del(namespace);
-    }
+    process.nextTick(() => this._tick());
   }
 
   /*
   * Locks the next job document for processing and returns it.
   */
 
-  async _lockJob(namespace) {
+  async _lockNext() {
     let sleepUntil = moment().add(this._lockDuration, 'millisecond').toDate();
     let currentDate = moment().toDate();
 
-    let filters = [];
-    if (typeof namespace !== 'undefined') {
-      filters.push(
-        {[this._namespaceFieldPath]: {$exists: true}},
-        {[this._namespaceFieldPath]: namespace}
-      );
-    } else if (this._watchedNamespaces) {
-      filters.push(
-        {[this._namespaceFieldPath]: {$exists: true}},
-        {[this._namespaceFieldPath]: {$in: this._watchedNamespaces}}
-      );
-    }
-    filters.push(
-      {[this._sleepUntilFieldPath]: {$exists: true}},
-      {[this._sleepUntilFieldPath]: {$not: {$gt: currentDate}}}
-    );
-
     let res = await this._collection.findOneAndUpdate({
-      $and: filters
+      $and: [
+        {[this._sleepUntilFieldPath]: {$exists: true}},
+        {[this._sleepUntilFieldPath]: {$not: {$gt: currentDate}}}
+      ]
     }, {
       $set: {
         [this._sleepUntilFieldPath]: sleepUntil
       }
     }, {
       returnOriginal: false
-      // IMPORTANT: sorting is not needed here
+      // by default, documents are ordered by the sleepUntil field
     });
     return res.value;
   }
