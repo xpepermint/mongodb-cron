@@ -93,7 +93,7 @@ export class MongoCron {
   async stop() {
     this._isRunning = false;
 
-    if (this._isProcessing || this._isIdle) {
+    if (this._isProcessing) {
       await sleep(300);
       return process.nextTick(this.stop.bind(this)); // wait until processing is complete
     }
@@ -117,13 +117,15 @@ export class MongoCron {
       let doc = await this._lockNext(); // locking next job
       if (!doc) {
         this._isProcessing = false;
-        this._isIdle = true;
-        if (this._onIdle) {
-          await this._onIdle.call(this, this);
+        if (!this._isIdle) {
+          this._isIdle = true;
+          if (this._onIdle) {
+            await this._onIdle.call(this, this);
+          }
         }
         await sleep(this._idleDelay);
-        this._isIdle = false;
       } else {
+        this._isIdle = false;
         if (this._onDocument) {
           await this._onDocument.call(this, doc, this);
         }

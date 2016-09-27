@@ -51,6 +51,18 @@ test.serial('cron should trigger event methods', async (t) => {
   t.is(onDocument, true);
 });
 
+test.serial('cron should trigger the `onIdle` handler only once', async (t) => {
+  let count = 0;
+  let c = new MongoCron({
+    collection: t.context.collection,
+    onIdle: () => count++
+  });
+  await c.start()
+  await sleep(1000);
+  await c.stop();
+  t.is(count, 1);
+});
+
 test.serial('locked documents should not be available for locking', async (t) => {
   let future = moment().add(5000, 'millisecond');
   let processed = false;
@@ -129,5 +141,5 @@ test.serial('document with `autoRemove` should be deleted when completed', async
   });
   await sleep(2000);
   await c.stop();
-  t.is((await c.collection.count()), 0);
+  t.is(await c.collection.count(), 0);
 });

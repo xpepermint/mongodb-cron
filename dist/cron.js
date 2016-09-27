@@ -123,7 +123,7 @@ class MongoCron {
     return _asyncToGenerator(function* () {
       _this2._isRunning = false;
 
-      if (_this2._isProcessing || _this2._isIdle) {
+      if (_this2._isProcessing) {
         yield (0, _es6Sleep.promise)(300);
         return process.nextTick(_this2.stop.bind(_this2)); // wait until processing is complete
       }
@@ -151,13 +151,15 @@ class MongoCron {
         let doc = yield _this3._lockNext(); // locking next job
         if (!doc) {
           _this3._isProcessing = false;
-          _this3._isIdle = true;
-          if (_this3._onIdle) {
-            yield _this3._onIdle.call(_this3, _this3);
+          if (!_this3._isIdle) {
+            _this3._isIdle = true;
+            if (_this3._onIdle) {
+              yield _this3._onIdle.call(_this3, _this3);
+            }
           }
           yield (0, _es6Sleep.promise)(_this3._idleDelay);
-          _this3._isIdle = false;
         } else {
+          _this3._isIdle = false;
           if (_this3._onDocument) {
             yield _this3._onDocument.call(_this3, doc, _this3);
           }
