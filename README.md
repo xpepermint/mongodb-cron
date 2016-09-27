@@ -8,7 +8,7 @@ This package offers a simple API for scheduling tasks and running recurring jobs
 
 <img src="giphy.gif" />
 
-## Setup
+## Installation
 
 This is a module for [Node.js](http://nodejs.org/) and can be installed via [npm](https://www.npmjs.com). The package depends on the  [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/) package.
 
@@ -180,9 +180,6 @@ let cron = new MongoCron({
   autoRemoveFieldPath: 'cron.autoRemove'
 });
 ```
-
-**cron.setup()**:Promise
-> Creates required collection indexes.
 
 **cron.start()**:Promise
 > Starts the cron processor.
