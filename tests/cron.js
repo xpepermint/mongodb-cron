@@ -1,6 +1,5 @@
 import test from 'ava';
 import {MongoClient, ObjectId} from 'mongodb';
-import Redis from 'ioredis';
 import {promise as sleep} from 'es6-sleep';
 import {MongoCron, MongoCronManager} from '../dist';
 import moment from 'moment';
@@ -8,13 +7,10 @@ import moment from 'moment';
 test.beforeEach(async (t) => {
   t.context.db = await MongoClient.connect('mongodb://localhost:27017/test');
   t.context.collection = t.context.db.collection('jobs');
-  t.context.redis = new Redis();
-  try { await t.context.redis.flushall() } catch(e) {}
   try { await t.context.collection.drop() } catch(e) {}
 });
 
 test.afterEach(async (t) => {
-  await t.context.redis.quit();
   await t.context.db.close();
 });
 

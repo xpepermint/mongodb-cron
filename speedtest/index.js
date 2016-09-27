@@ -1,6 +1,5 @@
 import {MongoClient, ObjectId} from 'mongodb';
 import {MongoCron} from '../src';
-import Redis from 'ioredis';
 
 /*
 * Number of documents.
@@ -56,11 +55,7 @@ async function testOneTimeJobs(mongo) {
 
 (async function() {
   let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
-  let redis = new Redis();
 
   await testOneTimeJobs(mongo);
-
   await mongo.close();
-  await redis.quit();
-
 })().catch(console.error);
