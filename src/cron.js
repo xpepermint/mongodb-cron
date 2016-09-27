@@ -187,7 +187,6 @@ export class MongoCron {
       {[this._sleepUntilFieldPath]: {$exists: true}},
     );
 
-    // ADD SORTING !!!!!!!!
     let cursor = await this._collection.aggregate([
       {
         $match: {
@@ -205,6 +204,7 @@ export class MongoCron {
           maxLockUntil: {$not: {$gt: currentDate}}
         }
       }
+      // IMPORTANT: sorting is not needed here
     ]).batchSize(1);
 
     let namespace = null;
@@ -267,8 +267,8 @@ export class MongoCron {
         [this._sleepUntilFieldPath]: sleepUntil
       }
     }, {
-      sort: {[this._sleepUntilFieldPath]: 1},
       returnOriginal: false
+      // IMPORTANT: sorting is not needed here
     });
     return res.value;
   }

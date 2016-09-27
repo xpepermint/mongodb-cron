@@ -242,7 +242,9 @@ class MongoCron {
         $match: {
           maxLockUntil: { $not: { $gt: currentDate } }
         }
-      }]).batchSize(1);
+      }
+      // IMPORTANT: sorting is not needed here
+      ]).batchSize(1);
 
       let namespace = null;
       do {
@@ -303,8 +305,8 @@ class MongoCron {
           [_this7._sleepUntilFieldPath]: sleepUntil
         }
       }, {
-        sort: { [_this7._sleepUntilFieldPath]: 1 },
         returnOriginal: false
+        // IMPORTANT: sorting is not needed here
       });
       return res.value;
     })();
