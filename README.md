@@ -169,6 +169,7 @@ let cron = new MongoCron({
   onStart: async (cron) => {},
   onStop: async (cron) => {},
   onDocument: async (doc, cron) => {},
+  onIdle: async (doc, cron) => {},
   onError: async (err, cron) => {},
   nextDelay: 1000,
   reprocessDelay: 1000,
