@@ -48,6 +48,7 @@ class MongoCron {
     this._onDocument = options.onDocument;
     this._onStart = options.onStart;
     this._onStop = options.onStop;
+    this._onIdle = options.onIdle;
     this._onError = options.onError || console.error;
 
     this._nextDelay = options.nextDelay || 0; // wait before processing next job
@@ -185,15 +186,21 @@ class MongoCron {
 
         let doc = yield _this4._lockJob(namespace); // locking next job
         if (!doc) {
-          if (namespace) {
+          if (typeof namespace !== 'undefined') {
             // processing for this namespace ended
             yield _this4._unlockNamespace(namespace);
-          } else if (namespace === null) {
-            // all namespaces (including the null) have been processed
+          }
+
+          if ( // idle state
+          _this4._namespaceDedication && namespace === null || !_this4._namespaceDedication) {
             _this4._isIdle = true;
+            if (_this4._onIdle) {
+              yield _this4._onIdle.call(_this4, _this4);
+            }
             yield (0, _es6Sleep.promise)(_this4._idleDelay);
             _this4._isIdle = false;
           }
+
           namespace = undefined; // no documents left, find new namespace
         } else {
           if (_this4._onDocument) {
