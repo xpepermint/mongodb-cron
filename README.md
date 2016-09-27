@@ -197,7 +197,7 @@ let job = await collection.insert({
 
 ## API
 
-**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, manager})**
+**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, minutelyQuota, hourlyQuota, dailyQuota, weeklyQuota, monthlyQuota})**
 > The core class for converting a MongoDB collection into a job queue.
 
 | Option | Type | Required | Default | Description
@@ -219,6 +219,11 @@ let job = await collection.insert({
 | intervalFieldPath | String | No | interval | The `interval` field path.
 | repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
 | autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
+| minutelyQuota | Integer | No | - | The maximum number of allowed jobs per minute (per namespace).
+| hourlyQuota | Integer | No | - | The maximum number of allowed jobs per hour (per namespace).
+| dailyQuota | Integer | No | - | The maximum number of allowed jobs per day (per namespace).
+| weeklyQuota | Integer | No | - | The maximum number of allowed jobs per week (per namespace).
+| monthlyQuota | Integer | No | - | The maximum number of allowed jobs per month (per namespace).
 
 ```js
 import Redis from 'ioredis';
@@ -246,7 +251,12 @@ let cron = new MongoCron({
   sleepUntilFieldPath: 'cron.sleepUntil',
   intervalFieldPath: 'cron.interval',
   repeatUntilFieldPath: 'cron.repeatUntil',
-  autoRemoveFieldPath: 'cron.autoRemove'
+  autoRemoveFieldPath: 'cron.autoRemove',
+  minutelyQuota: 10,
+  hourlyQuota: 100,
+  dailyQuota: 1000,
+  weeklyQuota: 5000
+  monthlyQuota: 20000
 });
 ```
 
@@ -273,15 +283,8 @@ let cron = new MongoCron({
 Processing speed can be reduced when more and more documents are added into the collection. We can maintain the speed by creating indexes.
 
 ```js
-await collection.createIndex({
-  namespace: 1,
-  sleepUntil: 1
-}, {
-  sparse: true
-});
+await cron.setup();
 ```
-
-Use the `cron.setup()` method to create required indexes.
 
 ## Best Practice
 

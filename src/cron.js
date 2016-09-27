@@ -187,6 +187,7 @@ export class MongoCron {
       {[this._sleepUntilFieldPath]: {$exists: true}},
     );
 
+    // ADD SORTING !!!!!!!!
     let cursor = await this._collection.aggregate([
       {
         $match: {

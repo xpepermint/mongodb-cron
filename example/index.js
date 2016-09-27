@@ -15,9 +15,7 @@ import {promise as sleep} from 'es6-sleep';
     reprocessDelay: 1000,
     idleDelay: 10000,
     lockDuration: 600000,
-    processableFieldPath: 'cron.processable',
-    lockUntilFieldPath: 'cron.lockUntil',
-    waitUntilFieldPath: 'cron.waitUntil',
+    sleepUntilFieldPath: 'cron.sleepUntil',
     intervalFieldPath: 'cron.interval',
     repeatUntilFieldPath: 'cron.repeatUntil',
     autoRemoveFieldPath: 'cron.autoRemove'
@@ -30,12 +28,12 @@ import {promise as sleep} from 'es6-sleep';
   setTimeout(function() {
     cron.collection.insert({
       name: 'Ricky Martin Show',
-      cron: {processable: true}
+      cron: {sleepUntil: null}
     });
   }, 2000);
 
   setTimeout(function() {
     cron.stop();
-  }, 20000);
+  }, 5000);
 
 })().catch(console.error);
