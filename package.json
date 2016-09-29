@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
@@ -55,9 +55,9 @@
     "mongodb": "2.2.x"
   },
   "dependencies": {
-    "dot-object": "1.5.2",
-    "es6-sleep": "2.0.x",
-    "later": "1.2.x",
-    "moment": "2.15.x"
+    "dot-object": "1.5.4",
+    "es6-sleep": "2.0.2",
+    "later": "1.2.0",
+    "moment": "2.15.1"
   }
 }
