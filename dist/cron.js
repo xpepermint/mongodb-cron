@@ -23,7 +23,7 @@ var _dotObject2 = _interopRequireDefault(_dotObject);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { return step("next", value); }, function (err) { return step("throw", err); }); } } return step("next"); }); }; }
+function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
 
 /*
 * Main class for converting a collection into cron.
@@ -36,7 +36,7 @@ class MongoCron {
   */
 
   constructor() {
-    let options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
+    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
     this._isRunning = false;
     this._isProcessing = false;

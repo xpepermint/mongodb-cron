@@ -1,13 +1,12 @@
 {
   "name": "mongodb-cron",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "scripts": {
     "clean": "rm -Rf ./dist",
     "prebuild": "npm run clean; mkdir -p ./dist",
     "build": "babel ./src --out-dir ./dist --copy-files",
-    "example": "babel-node ./example",
     "example": "babel-node ./example",
     "prepublish": "npm run build",
     "pretest": "npm run build",
@@ -48,7 +47,7 @@
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "devDependencies": {
     "ava": "0.16.x",
-    "babel-cli": "6.14.x",
+    "babel-cli": "6.16.x",
     "babel-preset-node5": "11.1.x",
     "mongodb": "2.2.x"
   },
