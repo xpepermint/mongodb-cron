@@ -1,23 +1,23 @@
-'use strict';
+"use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.MongoCron = undefined;
 
-var _mongodb = require('mongodb');
+var _mongodb = require("mongodb");
 
-var _moment = require('moment');
+var _moment = require("moment");
 
 var _moment2 = _interopRequireDefault(_moment);
 
-var _later = require('later');
+var _later = require("later");
 
 var _later2 = _interopRequireDefault(_later);
 
-var _es6Sleep = require('es6-sleep');
+var _es6Sleep = require("es6-sleep");
 
-var _dotObject = require('dot-object');
+var _dotObject = require("dot-object");
 
 var _dotObject2 = _interopRequireDefault(_dotObject);
 
@@ -55,10 +55,10 @@ class MongoCron {
     this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
     this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
 
-    this._sleepUntilFieldPath = options.sleepUntilFieldPath || 'sleepUntil';
-    this._intervalFieldPath = options.intervalFieldPath || 'interval';
-    this._repeatUntilFieldPath = options.repeatUntilFieldPath || 'repeatUntil';
-    this._autoRemoveFieldPath = options.autoRemoveFieldPath || 'autoRemove';
+    this._sleepUntilFieldPath = options.sleepUntilFieldPath || "sleepUntil";
+    this._intervalFieldPath = options.intervalFieldPath || "interval";
+    this._repeatUntilFieldPath = options.repeatUntilFieldPath || "repeatUntil";
+    this._autoRemoveFieldPath = options.autoRemoveFieldPath || "autoRemove";
   }
 
   /*
@@ -184,7 +184,7 @@ class MongoCron {
     var _this4 = this;
 
     return _asyncToGenerator(function* () {
-      let sleepUntil = (0, _moment2.default)().add(_this4._lockDuration, 'millisecond').toDate();
+      let sleepUntil = (0, _moment2.default)().add(_this4._lockDuration, "millisecond").toDate();
       let currentDate = (0, _moment2.default)().toDate();
 
       let res = yield _this4._collection.findOneAndUpdate({
@@ -212,8 +212,8 @@ class MongoCron {
       return null;
     }
 
-    let start = (0, _moment2.default)(_dotObject2.default.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
-    let future = (0, _moment2.default)().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
+    let start = (0, _moment2.default)(_dotObject2.default.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, "millisecond"); // get processing start date (before lock duration was added)
+    let future = (0, _moment2.default)().add(this._reprocessDelay, "millisecond"); // date when the next start is possible
     if (start >= future) {
       // already in future
       return start.toDate();
