@@ -1,8 +1,8 @@
-import {ObjectId} from 'mongodb';
-import moment from 'moment';
-import later from 'later';
-import {promise as sleep} from 'es6-sleep';
-import dot from 'dot-object';
+import { ObjectId } from "mongodb";
+import moment from "moment";
+import later from "later";
+import { promise as sleep } from "es6-sleep";
+import dot from "dot-object";
 
 /*
 * Main class for converting a collection into cron.
@@ -32,10 +32,10 @@ export class MongoCron {
     this._idleDelay = options.idleDelay || 0; // when there is no jobs for processing, wait before continue
     this._lockDuration = options.lockDuration || 600000; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
 
-    this._sleepUntilFieldPath = options.sleepUntilFieldPath || 'sleepUntil';
-    this._intervalFieldPath = options.intervalFieldPath || 'interval';
-    this._repeatUntilFieldPath = options.repeatUntilFieldPath || 'repeatUntil';
-    this._autoRemoveFieldPath = options.autoRemoveFieldPath || 'autoRemove';
+    this._sleepUntilFieldPath = options.sleepUntilFieldPath || "sleepUntil";
+    this._intervalFieldPath = options.intervalFieldPath || "interval";
+    this._repeatUntilFieldPath = options.repeatUntilFieldPath || "repeatUntil";
+    this._autoRemoveFieldPath = options.autoRemoveFieldPath || "autoRemove";
   }
 
   /*
@@ -144,7 +144,7 @@ export class MongoCron {
   */
 
   async _lockNext() {
-    let sleepUntil = moment().add(this._lockDuration, 'millisecond').toDate();
+    let sleepUntil = moment().add(this._lockDuration, "millisecond").toDate();
     let currentDate = moment().toDate();
 
     let res = await this._collection.findOneAndUpdate({
@@ -173,8 +173,8 @@ export class MongoCron {
       return null;
     }
 
-    let start = moment(dot.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
-    let future = moment().add(this._reprocessDelay, 'millisecond'); // date when the next start is possible
+    let start = moment(dot.pick(this._sleepUntilFieldPath, doc)).subtract(this._lockDuration, "millisecond"); // get processing start date (before lock duration was added)
+    let future = moment().add(this._reprocessDelay, "millisecond"); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
     }

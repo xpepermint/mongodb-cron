@@ -1,5 +1,5 @@
-import {MongoClient, ObjectId} from 'mongodb';
-import {MongoCron} from '../src';
+import { MongoClient, ObjectId } from "mongodb";
+import { MongoCron } from "../src";
 
 /*
 * Number of documents.
@@ -13,7 +13,7 @@ const SAMPLE_SIZE = process.argv[2] ? parseInt(process.argv[2]) : 1000;
 
 async function testOneTimeJobs(mongo) {
   let time = 0;
-  let collection = mongo.collection('jobs');
+  let collection = mongo.collection("jobs");
 
   try { await collection.drop() } catch(e) {}
 
@@ -54,7 +54,7 @@ async function testOneTimeJobs(mongo) {
 */
 
 (async function() {
-  let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
+  let mongo = await MongoClient.connect("mongodb://localhost:27017/test");
 
   await testOneTimeJobs(mongo);
   await mongo.close();

@@ -1,3 +1,3 @@
-import {MongoCron} from './cron';
+import { MongoCron } from "./cron";
 
-export {MongoCron};
+export { MongoCron };
