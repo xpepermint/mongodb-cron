@@ -6,7 +6,7 @@
 
 This package offers a simple API for scheduling tasks and running recurring jobs on [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a job queue or crontab list. It uses the officially supported [Node.js driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions even in cluster environments.
 
-<img src="giphy.gif" />
+<img src="https://github.com/xpepermint/mongodb-cron/raw/master/giphy.gif" />
 
 ## Installation
 
