@@ -20,20 +20,15 @@ $ npm install --save mongodb mongodb-cron
 
 ## Example
 
-Below, is a simple example to show the benefit of using this package in your Node.js projects. To make things as clean as possible, we use [Babel](https://babeljs.io/) with ES7 features, thus we can wrap our code into the async block.
+Below, is a simple example to show the benefit of using this package in your Node.js projects. 
 
-```js
-(async function() {
-  // code that follows
-})().catch(console.error);
-```
-
-Start by initializing the database connection.
+Let's start by initializing the database connection.
 
 ```js
 import { MongoClient } from 'mongodb';
 
-const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
+const mongo = await MongoClient.connect('mongodb://localhost:27017');
+const db = mongo.db('test');
 ```
 
 Continue by initializing and starting a the worker.
@@ -41,11 +36,11 @@ Continue by initializing and starting a the worker.
 ```js
 import { MongoCron } from 'mongodb-cron';
 
-const collection = mongo.collection('jobs');
+const collection = db.collection('jobs');
 const cron = new MongoCron({
   collection, // a collection where jobs are stored
-  onDocument: async (doc, cron) => console.log(doc), // triggered on job processing
-  onError: async (err, cron) => console.log(err), // triggered on error
+  onDocument: async (doc) => console.log(doc), // triggered on job processing
+  onError: async (err) => console.log(err), // triggered on error
 });
 
 cron.start(); // start processing
@@ -168,12 +163,12 @@ import { MongoClient } from 'mongodb';
 const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
 
 const cron = new MongoCron({
-  collection: mongo.collection('jobs'),
-  onStart: async (cron) => {},
-  onStop: async (cron) => {},
-  onDocument: async (doc, cron) => {},
-  onIdle: async (doc, cron) => {},
-  onError: async (err, cron) => {},
+  collection: db.collection('jobs'),
+  onStart: async () => {},
+  onStop: async () => {},
+  onDocument: async (doc) => {},
+  onIdle: async (doc) => {},
+  onError: async (err) => {},
   nextDelay: 1000,
   reprocessDelay: 1000,
   idleDelay: 10000,
@@ -211,6 +206,8 @@ await collection.createIndex({
   sparse: true,
 });
 ```
+
+Don't forget to adjust the index definition when using your custom query `condition`.
 
 ## Best Practice
 
