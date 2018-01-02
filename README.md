@@ -6,11 +6,13 @@
 
 This package offers a simple API for scheduling tasks and running recurring jobs on [MongoDB](https://www.mongodb.org) collections. Any collection can be converted into a job queue or crontab list. It uses the officially supported [Node.js driver for MongoDB](https://docs.mongodb.com/ecosystem/drivers/node-js/). It's fast, minimizes processing overhead and it uses atomic commands to ensure safe job executions even in cluster environments.
 
+This is a light weight open source package for NodeJS written with [TypeScript](https://www.typescriptlang.org). It's actively maintained, well tested and already used in production environments. The source code is available on [GitHub](https://github.com/xpepermint/mongodb-cron) where you can also find our [issue tracker](https://github.com/xpepermint/mongodb-cron/issues).
+
 <img src="https://github.com/xpepermint/mongodb-cron/raw/master/giphy.gif" />
 
 ## Installation
 
-This is a module for [Node.js](http://nodejs.org/) and can be installed via [npm](https://www.npmjs.com). The package depends on the  [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/) package.
+This is a module for [Node.js](http://nodejs.org/) and can be installed via [npm](https://www.npmjs.com). It depends on the [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/) package and uses promises.
 
 ```
 $ npm install --save mongodb mongodb-cron
@@ -29,21 +31,21 @@ Below, is a simple example to show the benefit of using this package in your Nod
 Start by initializing the database connection.
 
 ```js
-import {MongoClient} from 'mongodb';
+import { MongoClient } from 'mongodb';
 
-let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
+const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
 ```
 
 Continue by initializing and starting a the worker.
 
 ```js
-import {MongoCron} from 'mongodb-cron';
+import { MongoCron } from 'mongodb-cron';
 
-let collection = mongo.collection('jobs');
-let cron = new MongoCron({
+const collection = mongo.collection('jobs');
+const cron = new MongoCron({
   collection, // a collection where jobs are stored
   onDocument: async (doc, cron) => console.log(doc), // triggered on job processing
-  onError: async (err, cron) => console.log(err) // triggered on error
+  onError: async (err, cron) => console.log(err), // triggered on error
 });
 
 cron.start(); // start processing
@@ -52,8 +54,8 @@ cron.start(); // start processing
 We can now create our first job.
 
 ```js
-let job = await collection.insert({
-  sleepUntil: new Date('2016-01-01')
+const job = await collection.insert({
+  sleepUntil: new Date('2016-01-01'),
 });
 ```
 
@@ -70,8 +72,8 @@ A job should have at least the `sleepUntil` field. Cron processes only documents
 To create a one-time job we only need to define the required field `sleepUntil`. When this filed is set to `null`, the processing starts immediately.
 
 ```js
-let job = await collection.insert({
-  sleepUntil: null
+const job = await collection.insert({
+  sleepUntil: null,
 });
 ```
 
@@ -86,9 +88,9 @@ If cron is unexpectedly interrupted during the processing of a job (e.g. server 
 We can schedule job execution for a particular time in the future by setting the `sleepUntil` field to the desired date.
 
 ```js
-let job = await collection.insert({
+const job = await collection.insert({
   ...
-  sleepUntil: new Date('2016-01-01') // start on 2016-01-01
+  sleepUntil: new Date('2016-01-01'), // start on 2016-01-01
 });
 ```
 
@@ -97,9 +99,9 @@ let job = await collection.insert({
 By setting the `interval` field we define a recurring job.
 
 ```js
-let job = await collection.insert({
+const job = await collection.insert({
   ...
-  interval: '* * * * * *' // every second
+  interval: '* * * * * *', // every second
 });
 ```
 
@@ -119,10 +121,10 @@ The interval above consists of 6 values.
 A recurring job will repeat endlessly unless we limit that by setting the `repeatUntil` field. When a job expires it stops repeating by removing the `processable` field.
 
 ```js
-let job = await collection.insert({
+const job = await collection.insert({
   ...
   interval: '* * * * * *',
-  repeatUntil: new Date('2020-01-01')
+  repeatUntil: new Date('2020-01-01'),
 });
 ```
 
@@ -131,20 +133,21 @@ let job = await collection.insert({
 A job can automatically remove itself from the collection when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
 
 ```js
-let job = await collection.insert({
+const job = await collection.insert({
   ...
-  autoRemove: true
+  autoRemove: true,
 });
 ```
 
 ## API
 
-**new MongoCron({collection, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath})**
+**new MongoCron({ collection, condition, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath })**
 > The core class for converting a MongoDB collection into a job queue.
 
 | Option | Type | Required | Default | Description
 |--------|------|----------|---------|------------
 | collection | Object | Yes | - | MongoDB collection object.
+| condition | Object | No | null | Additional query condition.
 | onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
 | onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
 | onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
@@ -160,11 +163,11 @@ let job = await collection.insert({
 | autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
 
 ```js
-import {MongoClient} from 'mongodb';
+import { MongoClient } from 'mongodb';
 
-let mongo = await MongoClient.connect('mongodb://localhost:27017/test');
+const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
 
-let cron = new MongoCron({
+const cron = new MongoCron({
   collection: mongo.collection('jobs'),
   onStart: async (cron) => {},
   onStop: async (cron) => {},
@@ -178,7 +181,7 @@ let cron = new MongoCron({
   sleepUntilFieldPath: 'cron.sleepUntil',
   intervalFieldPath: 'cron.interval',
   repeatUntilFieldPath: 'cron.repeatUntil',
-  autoRemoveFieldPath: 'cron.autoRemove'
+  autoRemoveFieldPath: 'cron.autoRemove',
 });
 ```
 
@@ -188,13 +191,13 @@ let cron = new MongoCron({
 **cron.stop()**:Promise
 > Stops the cron processor.
 
-**cron.isRunning**:Boolean
+**cron.isRunning()**:Boolean
 > Returns true if the cron is started.
 
-**cron.isProcessing**:Boolean
+**cron.isProcessing()**:Boolean
 > Returns true if cron is processing a document.
 
-**cron.isIdle**:Boolean
+**cron.isIdle()**:Boolean
 > Returns true if the cron is in idle state.
 
 ## Processing Speed
@@ -203,9 +206,9 @@ Processing speed can be reduced when more and more documents are added into the 
 
 ```js
 await collection.createIndex({
-  sleepUntil: 1 // the `sleepUntil` field path, set by the sleepUntilFieldPath
+  sleepUntil: 1, // the `sleepUntil` field path, set by the sleepUntilFieldPath
 }, {
-  sparse: true
+  sparse: true,
 });
 ```
 

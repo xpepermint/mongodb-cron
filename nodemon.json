@@ -1,4 +1,4 @@
 {
-  "verbose": true,
-  "ignore": ["dist/*"]
+  "ignore": ["dist/*"],
+  "ext": "js,ts"
 }
