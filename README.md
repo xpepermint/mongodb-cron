@@ -20,7 +20,7 @@ $ npm install --save mongodb mongodb-cron
 
 ## Example
 
-Below, is a simple example to show the benefit of using this package in your Node.js projects. 
+Below, is a simple example to show the benefit of using this package in your Node.js projects.
 
 Let's start by initializing the database connection.
 
@@ -123,6 +123,19 @@ const job = await collection.insert({
 });
 ```
 
+### Making `sleepUntil = null` not start immediately
+
+By adding the option `rescheduleIfSleepUntilIsNull: true` will make the job run only on the next schedule time, for example, if now is 12PM and this document is added:
+
+```js
+{
+    interval: '0 0 13 * * *'
+    sleepUntil: null
+}
+```
+and `rescheduleIfSleepUntilIsNull: true` the job will wait until 1 PM to run
+
+
 ## Auto-removable Jobs
 
 A job can automatically remove itself from the collection when the processing completes. To configure that, we need to set the `autoRemove` field to `true`.
@@ -134,14 +147,50 @@ const job = await collection.insert({
 });
 ```
 
+
+## Statistics
+
+It's possible to store some statistics into `statisticsCollection`.
+
+A typical document will look like:
+
+```js
+  {
+    document: {
+      /* the original document */
+      _id: ObjectID('9733e815fc8eafc108585d99c64fb449'),
+      interval: '* * * * * *',
+      sleepMs: 200,
+      sleepUntil: null
+    },
+    jobStart: ISODate('2018-03-02T13:54:36.800Z'),
+    jobEnd: ISODate('2018-03-02T13:54:37.004Z'),
+    executionTime: 204,
+    serverName: 'ip-192-168-1-106.ec2.internal',
+    cronName: 'my beautiful cron'
+}
+
+```
+
+It's also a good practice to expire documents, this can be achieved by setting
+an index on the collection with a TTS.
+
+```js
+db.statisticsCollection.createIndex(
+  { "jobStart": 1 },
+  { expireAfterSeconds: 604800 }
+);
+```
+
 ## API
 
-**new MongoCron({ collection, condition, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath })**
+**new MongoCron({ collection, condition, onStart, onStop, onDocument, onError, nextDelay, reprocessDelay, idleDelay, lockDuration, sleepUntilFieldPath, intervalFieldPath, repeatUntilFieldPath, autoRemoveFieldPath, rescheduleIfSleepUntilIsNull, returnOriginalDocument, cronName })**
 > The core class for converting a MongoDB collection into a job queue.
 
 | Option | Type | Required | Default | Description
 |--------|------|----------|---------|------------
 | collection | Object | Yes | - | MongoDB collection object.
+| statisticsCollection | Object | No | - | MongoDB collection object.
 | condition | Object | No | null | Additional query condition.
 | onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
 | onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
@@ -156,6 +205,9 @@ const job = await collection.insert({
 | intervalFieldPath | String | No | interval | The `interval` field path.
 | repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
 | autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
+| rescheduleIfSleepUntilIsNull | Boolean | No | false | Do not call `onDocument` when sleepUntil is null
+| returnOriginalDocument | Boolean | No | false | Passes the original document to `onDocument`, original document will have the sleepUntil in the past. The default is to return the modified document with the sleepUntil in the future
+| cronName | String | No | mongodb-cron | Will log the cron name into `statisticsCollection`, useful if you have multiple crons and want to use the same collection to store statistics
 
 ```js
 import { MongoClient } from 'mongodb';
@@ -164,6 +216,7 @@ const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
 
 const cron = new MongoCron({
   collection: db.collection('jobs'),
+  statisticsCollection: db.collection('jobs_stats'),
   onStart: async () => {},
   onStop: async () => {},
   onDocument: async (doc) => {},
@@ -177,6 +230,9 @@ const cron = new MongoCron({
   intervalFieldPath: 'cron.interval',
   repeatUntilFieldPath: 'cron.repeatUntil',
   autoRemoveFieldPath: 'cron.autoRemove',
+  rescheduleIfSleepUntilIsNull: false,
+  returnOriginalDocument: false,
+  cronName: 'my cron',
 });
 ```
 

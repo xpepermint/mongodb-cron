@@ -1,6 +1,8 @@
 import * as later from 'later';
 import * as dot from 'dot-object';
 import * as moment from 'moment';
+import * as _ from 'lodash';
+import * as os from 'os';
 import { ObjectId, Collection, Document } from 'mongodb';
 import { promise as sleep } from 'es6-sleep';
 
@@ -9,6 +11,7 @@ import { promise as sleep } from 'es6-sleep';
  */
 export interface MongoCronCfg {
   collection: Collection;
+  statisticsCollection?: Collection;
   condition?: any;
   onDocument?: (doc: any) => (any | Promise<any>);
   onStart?: (doc: any) => (any | Promise<any>);
@@ -19,10 +22,13 @@ export interface MongoCronCfg {
   reprocessDelay?: number; // wait before processing the same job again
   idleDelay?: number; // when there is no jobs for processing, wait before continue
   lockDuration?: number; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
+  rescheduleIfSleepUntilIsNull?: boolean; // will not call onDocument when sleepUntil is null, just reschedule next run
+  returnOriginalDocument?: boolean; // when true passes the original document to onDocument
   sleepUntilFieldPath?: string;
   intervalFieldPath?: string;
   repeatUntilFieldPath?: string;
   autoRemoveFieldPath?: string;
+  cronName?: string;
 }
 
 /**
@@ -33,6 +39,7 @@ export class MongoCron {
   protected processing: boolean = false;
   protected idle: boolean = false;
   readonly config: MongoCronCfg;
+  private serverName: string;
 
   /**
    * Class constructor.
@@ -40,18 +47,23 @@ export class MongoCron {
    */
   public constructor(config: MongoCronCfg) {
     this.config = {
+      statisticsCollection: null,
       onDocument: console.log,
       onError: console.error,
       nextDelay: 0,
       reprocessDelay: 0,
       idleDelay: 0,
       lockDuration: 600000,
+      rescheduleIfSleepUntilIsNull: false,
+      returnOriginalDocument: false,
       sleepUntilFieldPath: 'sleepUntil',
       intervalFieldPath: 'interval',
       repeatUntilFieldPath: 'repeatUntil',
       autoRemoveFieldPath: 'autoRemove',
+      cronName: 'mongodb-cron',
       ...config,
     };
+    this.serverName = os.hostname();
   }
 
   /**
@@ -116,7 +128,7 @@ export class MongoCron {
 
     this.processing = true;
     try {
-      let doc = await this.lockNext(); // locking next job
+      let [doc, lockedSleepUntil] = await this.lockNext(); // locking next job
       if (!doc) {
         this.processing = false;
         if (!this.idle) {
@@ -129,7 +141,23 @@ export class MongoCron {
       } else {
         this.idle = false;
         if (this.config.onDocument) {
-          await this.config.onDocument.call(this, doc, this);
+          if (!(this.config.rescheduleIfSleepUntilIsNull
+              && dot.pick(this.config.sleepUntilFieldPath, doc) === null
+              && dot.pick(this.config.intervalFieldPath, doc))
+          ) {
+            let clonedDoc = _.cloneDeep(doc);
+            if (!this.config.returnOriginalDocument) {
+              // Set the sleepUntil on the cloned document
+              // This is the default: returning the sleepUntil is the future (now+lockDuration)
+              dot.del(this.config.sleepUntilFieldPath, clonedDoc);
+              dot.str(this.config.sleepUntilFieldPath, lockedSleepUntil, clonedDoc);
+            }
+            const jobStart = moment.utc().toDate();
+            await this.config.onDocument.call(this, clonedDoc, this);
+            if (this.config.statisticsCollection) {
+              this.saveStatistics(doc, jobStart, moment.utc().toDate());
+            }
+          }
         }
         await this.reschedule(doc);
         this.processing = false;
@@ -157,9 +185,10 @@ export class MongoCron {
     }, {
       $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
     }, {
-      returnOriginal: false, // by default, documents are ordered by the sleepUntil field
+      returnOriginal: true, // by default, documents are ordered by the sleepUntil field
+      // changed this and if returnOriginalDocument is false (default) will recalculate the sleepUntil before passes to onDocument
     });
-    return res.value;
+    return [res.value, sleepUntil];
   }
 
   /**
@@ -171,7 +200,7 @@ export class MongoCron {
       return null;
     }
 
-    let start = moment(dot.pick(this.config.sleepUntilFieldPath, doc)).subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
+    let start = moment(dot.pick(this.config.sleepUntilFieldPath, doc)); // get processing start date
     let future = moment().add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
@@ -180,7 +209,10 @@ export class MongoCron {
     try { // new date
       let schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
       let dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-      let next = dates[1];
+      let next = dates[0];
+      if (this.config.reprocessDelay === 0 && future.isSame(next)) { // Avoid rescheduling to the same moment when no reprocessDelay
+        next = dates.length > 0 ? dates[1] : null;
+      }
       return next instanceof Date ? next : null;
     } catch (err) {
       return null;
@@ -210,6 +242,20 @@ export class MongoCron {
         }
       });
     }
+  }
+
+  /**
+   * Saves statistics to statistics collection
+   */
+  private async saveStatistics(doc, jobStart, jobEnd) {
+    this.config.statisticsCollection.insert({
+      document: doc,
+      jobStart,
+      jobEnd,
+      executionTime: jobEnd.getTime() - jobStart.getTime(),
+      serverName: this.serverName,
+      cronName: this.config.cronName
+    });
   }
 
 }
