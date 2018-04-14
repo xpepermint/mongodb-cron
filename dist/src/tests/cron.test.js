@@ -77,17 +77,20 @@ ava_1.default.afterEach(function (t) { return __awaiter(_this, void 0, void 0, f
     });
 }); });
 ava_1.default.serial('document with `sleepUntil` should be processed', function (t) { return __awaiter(_this, void 0, void 0, function () {
-    var c, _a, _b;
+    var times, c, _a, _b;
     return __generator(this, function (_c) {
         switch (_c.label) {
             case 0:
+                times = 0;
                 c = new __1.MongoCron({
-                    collection: t.context.collection
+                    collection: t.context.collection,
+                    onDocument: function () { return times++; },
                 });
                 return [4, t.context.collection.insert([
+                        { sleepUntil: new Date() },
+                        { sleepUntil: new Date() },
                         { sleepUntil: null },
-                        { sleepUntil: null },
-                        { sleepUntil: null }
+                        { sleepUntil: new Date() },
                     ])];
             case 1:
                 _c.sent();
@@ -100,8 +103,9 @@ ava_1.default.serial('document with `sleepUntil` should be processed', function 
                 return [4, c.stop()];
             case 4:
                 _c.sent();
+                t.is(times, 3);
                 _b = (_a = t).is;
-                return [4, t.context.collection.count({ sleepUntil: { $exists: true } })];
+                return [4, t.context.collection.count({ sleepUntil: { $ne: null } })];
             case 5:
                 _b.apply(_a, [_c.sent(), 0]);
                 return [2];
@@ -130,7 +134,7 @@ ava_1.default.serial('cron should trigger event methods', function (t) { return 
                     }); }); },
                 });
                 return [4, t.context.collection.insert({
-                        sleepUntil: null
+                        sleepUntil: new Date(),
                     })];
             case 1:
                 _a.sent();
@@ -161,7 +165,7 @@ ava_1.default.serial('cron should trigger the `onIdle` handler only once', funct
                 count = 0;
                 c = new __1.MongoCron({
                     collection: t.context.collection,
-                    onIdle: function () { return count++; }
+                    onIdle: function () { return count++; },
                 });
                 return [4, c.start()];
             case 1:
@@ -190,7 +194,7 @@ ava_1.default.serial('locked documents should not be available for locking', fun
                     onDocument: function () { return processed = true; },
                 });
                 return [4, t.context.collection.insert({
-                        sleepUntil: future.toDate()
+                        sleepUntil: future.toDate(),
                     })];
             case 1:
                 _a.sent();
@@ -256,13 +260,13 @@ ava_1.default.serial('document processing should not start before `sleepUntil`',
                     collection: t.context.collection,
                     onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                         return [2, ranInFuture = moment() >= future];
-                    }); }); }
+                    }); }); },
                 });
                 return [4, c.start()];
             case 1:
                 _a.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: future.toDate()
+                        sleepUntil: future.toDate(),
                     })];
             case 2:
                 _a.sent();
@@ -294,8 +298,8 @@ ava_1.default.serial('document with `interval` should run repeatedly', function 
             case 1:
                 _a.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: null,
-                        interval: '* * * * * *'
+                        sleepUntil: new Date(),
+                        interval: '* * * * * *',
                     })];
             case 2:
                 _a.sent();
@@ -323,15 +327,15 @@ ava_1.default.serial('document should stop recurring at `repeatUntil`', function
                     onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                         return [2, repeated++];
                     }); }); },
-                    reprocessDelay: 1000
+                    reprocessDelay: 1000,
                 });
                 return [4, c.start()];
             case 1:
                 _a.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: null,
+                        sleepUntil: new Date(),
                         interval: '* * * * * *',
-                        repeatUntil: stop.toDate()
+                        repeatUntil: stop.toDate(),
                     })];
             case 2:
                 _a.sent();
@@ -358,8 +362,8 @@ ava_1.default.serial('document with `autoRemove` should be deleted when complete
             case 1:
                 _c.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: null,
-                        autoRemove: true
+                        sleepUntil: new Date(),
+                        autoRemove: true,
                     })];
             case 2:
                 _c.sent();

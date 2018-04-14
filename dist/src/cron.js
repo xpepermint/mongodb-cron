@@ -180,7 +180,7 @@ var MongoCron = (function () {
                         currentDate = moment().toDate();
                         return [4, this.getCollection().findOneAndUpdate({
                                 $and: [
-                                    (_a = {}, _a[this.config.sleepUntilFieldPath] = { $exists: true }, _a),
+                                    (_a = {}, _a[this.config.sleepUntilFieldPath] = { $exists: true, $ne: null }, _a),
                                     (_b = {}, _b[this.config.sleepUntilFieldPath] = { $not: { $gt: currentDate } }, _b),
                                     this.config.condition,
                                 ].filter(function (c) { return !!c; })
@@ -232,7 +232,7 @@ var MongoCron = (function () {
                     case 2:
                         if (!!nextStart) return [3, 4];
                         return [4, this.getCollection().updateOne({ _id: _id }, {
-                                $unset: (_a = {}, _a[this.config.sleepUntilFieldPath] = 1, _a)
+                                $set: (_a = {}, _a[this.config.sleepUntilFieldPath] = null, _a)
                             })];
                     case 3:
                         _c.sent();

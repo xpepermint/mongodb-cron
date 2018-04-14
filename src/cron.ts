@@ -160,7 +160,7 @@ export class MongoCron {
 
     const res = await this.getCollection().findOneAndUpdate({
       $and: [
-        { [this.config.sleepUntilFieldPath]: { $exists: true }},
+        { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null }},
         { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
         this.config.condition,
       ].filter((c) => !!c)
@@ -210,7 +210,7 @@ export class MongoCron {
       await this.getCollection().deleteOne({ _id });
     } else if (!nextStart) { // stop execution
       await this.getCollection().updateOne({ _id }, {
-        $unset: { [this.config.sleepUntilFieldPath]: 1 }
+        $set: { [this.config.sleepUntilFieldPath]: null }
       });
     } else { // reschedule for reprocessing in the future (recurring)
       await this.getCollection().updateOne({ _id }, {

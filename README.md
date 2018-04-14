@@ -64,23 +64,23 @@ A job should have at least the `sleepUntil` field. Cron processes only documents
 
 ### One-time Jobs
 
-To create a one-time job we only need to define the required field `sleepUntil`. When this filed is set to `null`, the processing starts immediately.
+To create a one-time job we only need to define the required field `sleepUntil`. When this filed is set to some date in the past, the processing starts immediately.
 
 ```js
 const job = await collection.insert({
-  sleepUntil: null,
+  sleepUntil: new Date(),
 });
 ```
 
 When the processing of a document starts the `sleepUntil` field is updated to a new date in the future. This locks the document for a certain amount of time in which the processing must complete (lock duration is configurable). This mechanism prevents possible race conditions and ensures that a job is always processed by only one process at a time.
 
-When the processing ends, the `sleepUntil` field is removed.
+When the processing ends, the `sleepUntil` field is set to `null`.
 
 If cron is unexpectedly interrupted during the processing of a job (e.g. server shutdown), the system automatically recovers and transparently restarts.
 
 ## Deferred Execution
 
-We can schedule job execution for a particular time in the future by setting the `sleepUntil` field to the desired date.
+We can schedule job execution for a particular time in the future by setting the `sleepUntil` field to a future date.
 
 ```js
 const job = await collection.insert({
