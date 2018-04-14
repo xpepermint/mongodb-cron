@@ -1,6 +1,6 @@
 import { Collection } from 'mongodb';
 export interface MongoCronCfg {
-    collection: Collection;
+    collection: Collection | (() => Collection);
     condition?: any;
     onDocument?: (doc: any) => (any | Promise<any>);
     onStart?: (doc: any) => (any | Promise<any>);
@@ -22,6 +22,7 @@ export declare class MongoCron {
     protected idle: boolean;
     readonly config: MongoCronCfg;
     constructor(config: MongoCronCfg);
+    protected getCollection(): Collection;
     isRunning(): boolean;
     isProcessing(): boolean;
     isIdle(): boolean;

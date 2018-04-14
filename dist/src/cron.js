@@ -46,15 +46,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var later = require("later");
 var dot = require("dot-object");
 var moment = require("moment");
-var mongodb_1 = require("mongodb");
 var es6_sleep_1 = require("es6-sleep");
 var MongoCron = (function () {
     function MongoCron(config) {
         this.running = false;
         this.processing = false;
         this.idle = false;
-        this.config = __assign({ onDocument: console.log, onError: console.error, nextDelay: 0, reprocessDelay: 0, idleDelay: 0, lockDuration: 600000, sleepUntilFieldPath: 'sleepUntil', intervalFieldPath: 'interval', repeatUntilFieldPath: 'repeatUntil', autoRemoveFieldPath: 'autoRemove' }, config);
+        this.config = __assign({ onDocument: function (doc) { return doc; }, onError: console.error, nextDelay: 0, reprocessDelay: 0, idleDelay: 0, lockDuration: 600000, sleepUntilFieldPath: 'sleepUntil', intervalFieldPath: 'interval', repeatUntilFieldPath: 'repeatUntil', autoRemoveFieldPath: 'autoRemove' }, config);
     }
+    MongoCron.prototype.getCollection = function () {
+        return typeof this.config.collection === 'function'
+            ? this.config.collection()
+            : this.config.collection;
+    };
     MongoCron.prototype.isRunning = function () {
         return this.running;
     };
@@ -174,7 +178,7 @@ var MongoCron = (function () {
                     case 0:
                         sleepUntil = moment().add(this.config.lockDuration, 'millisecond').toDate();
                         currentDate = moment().toDate();
-                        return [4, this.config.collection.findOneAndUpdate({
+                        return [4, this.getCollection().findOneAndUpdate({
                                 $and: [
                                     (_a = {}, _a[this.config.sleepUntilFieldPath] = { $exists: true }, _a),
                                     (_b = {}, _b[this.config.sleepUntilFieldPath] = { $not: { $gt: currentDate } }, _b),
@@ -196,7 +200,8 @@ var MongoCron = (function () {
         if (!dot.pick(this.config.intervalFieldPath, doc)) {
             return null;
         }
-        var start = moment(dot.pick(this.config.sleepUntilFieldPath, doc)).subtract(this.config.lockDuration, 'millisecond');
+        var start = moment(dot.pick(this.config.sleepUntilFieldPath, doc))
+            .subtract(this.config.lockDuration, 'millisecond');
         var future = moment().add(this.config.reprocessDelay, 'millisecond');
         if (start >= future) {
             return start.toDate();
@@ -213,31 +218,27 @@ var MongoCron = (function () {
     };
     MongoCron.prototype.reschedule = function (doc) {
         return __awaiter(this, void 0, void 0, function () {
-            var nextStart, _id, res, _a, _b;
+            var nextStart, _id, _a, _b;
             return __generator(this, function (_c) {
                 switch (_c.label) {
                     case 0:
                         nextStart = this.getNextStart(doc);
-                        _id = mongodb_1.ObjectId(doc._id);
+                        _id = doc._id;
                         if (!(!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc))) return [3, 2];
-                        return [4, this.config.collection.deleteOne({ _id: _id })];
+                        return [4, this.getCollection().deleteOne({ _id: _id })];
                     case 1:
                         _c.sent();
                         return [3, 6];
                     case 2:
                         if (!!nextStart) return [3, 4];
-                        return [4, this.config.collection.updateOne({ _id: _id }, {
-                                $unset: (_a = {},
-                                    _a[this.config.sleepUntilFieldPath] = 1,
-                                    _a)
+                        return [4, this.getCollection().updateOne({ _id: _id }, {
+                                $unset: (_a = {}, _a[this.config.sleepUntilFieldPath] = 1, _a)
                             })];
                     case 3:
-                        res = _c.sent();
+                        _c.sent();
                         return [3, 6];
-                    case 4: return [4, this.config.collection.updateOne({ _id: _id }, {
-                            $set: (_b = {},
-                                _b[this.config.sleepUntilFieldPath] = nextStart,
-                                _b)
+                    case 4: return [4, this.getCollection().updateOne({ _id: _id }, {
+                            $set: (_b = {}, _b[this.config.sleepUntilFieldPath] = nextStart, _b)
                         })];
                     case 5:
                         _c.sent();

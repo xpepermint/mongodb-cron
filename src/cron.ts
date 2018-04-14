@@ -1,14 +1,14 @@
 import * as later from 'later';
 import * as dot from 'dot-object';
 import * as moment from 'moment';
-import { ObjectId, Collection, Document } from 'mongodb';
+import { ObjectId, Collection } from 'mongodb';
 import { promise as sleep } from 'es6-sleep';
 
 /**
  * Configuration object interface.
  */
 export interface MongoCronCfg {
-  collection: Collection;
+  collection: Collection | (() => Collection);
   condition?: any;
   onDocument?: (doc: any) => (any | Promise<any>);
   onStart?: (doc: any) => (any | Promise<any>);
@@ -40,7 +40,7 @@ export class MongoCron {
    */
   public constructor(config: MongoCronCfg) {
     this.config = {
-      onDocument: console.log,
+      onDocument: (doc) => doc,
       onError: console.error,
       nextDelay: 0,
       reprocessDelay: 0,
@@ -52,6 +52,16 @@ export class MongoCron {
       autoRemoveFieldPath: 'autoRemove',
       ...config,
     };
+  }
+
+  /**
+   * Returns the collection instance (the collection can be provided in
+   * the config as an instance or a function).
+   */
+  protected getCollection(): Collection {
+    return typeof this.config.collection === 'function'
+      ? this.config.collection()
+      : this.config.collection;
   }
 
   /**
@@ -116,7 +126,7 @@ export class MongoCron {
 
     this.processing = true;
     try {
-      let doc = await this.lockNext(); // locking next job
+      const doc = await this.lockNext(); // locking next job
       if (!doc) {
         this.processing = false;
         if (!this.idle) {
@@ -145,13 +155,13 @@ export class MongoCron {
    * Locks the next job document for processing and returns it.
    */
   protected async lockNext() {
-    let sleepUntil = moment().add(this.config.lockDuration, 'millisecond').toDate();
-    let currentDate = moment().toDate();
+    const sleepUntil = moment().add(this.config.lockDuration, 'millisecond').toDate();
+    const currentDate = moment().toDate();
 
-    let res = await this.config.collection.findOneAndUpdate({
+    const res = await this.getCollection().findOneAndUpdate({
       $and: [
-        {[this.config.sleepUntilFieldPath]: {$exists: true}},
-        {[this.config.sleepUntilFieldPath]: {$not: {$gt: currentDate}}},
+        { [this.config.sleepUntilFieldPath]: { $exists: true }},
+        { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
         this.config.condition,
       ].filter((c) => !!c)
     }, {
@@ -171,16 +181,17 @@ export class MongoCron {
       return null;
     }
 
-    let start = moment(dot.pick(this.config.sleepUntilFieldPath, doc)).subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
-    let future = moment().add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
+    const start = moment(dot.pick(this.config.sleepUntilFieldPath, doc))
+      .subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
+    const future = moment().add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
     }
 
     try { // new date
-      let schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
-      let dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-      let next = dates[1];
+      const schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
+      const dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
+      const next = dates[1];
       return next instanceof Date ? next : null;
     } catch (err) {
       return null;
@@ -192,22 +203,18 @@ export class MongoCron {
    * if `autoRemove` is set to `true`.
    */
   public async reschedule(doc) {
-    let nextStart = this.getNextStart(doc);
-    let _id = ObjectId(doc._id);
+    const nextStart = this.getNextStart(doc);
+    const _id = doc._id;
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
-      await this.config.collection.deleteOne({_id});
+      await this.getCollection().deleteOne({ _id });
     } else if (!nextStart) { // stop execution
-      let res = await this.config.collection.updateOne({_id}, {
-        $unset: {
-          [this.config.sleepUntilFieldPath]: 1
-        }
+      await this.getCollection().updateOne({ _id }, {
+        $unset: { [this.config.sleepUntilFieldPath]: 1 }
       });
     } else { // reschedule for reprocessing in the future (recurring)
-      await this.config.collection.updateOne({_id}, {
-        $set: {
-          [this.config.sleepUntilFieldPath]: nextStart
-        }
+      await this.getCollection().updateOne({ _id }, {
+        $set: { [this.config.sleepUntilFieldPath]: nextStart }
       });
     }
   }

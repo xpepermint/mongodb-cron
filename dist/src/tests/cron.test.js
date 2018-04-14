@@ -178,12 +178,12 @@ ava_1.default.serial('cron should trigger the `onIdle` handler only once', funct
     });
 }); });
 ava_1.default.serial('locked documents should not be available for locking', function (t) { return __awaiter(_this, void 0, void 0, function () {
-    var future, processed, c;
+    var processed, future, c;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                future = moment().add(5000, 'millisecond');
                 processed = false;
+                future = moment().add(5000, 'millisecond');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
                     lockDuration: 5000,
@@ -246,12 +246,12 @@ ava_1.default.serial('condition should filter lockable documents', function (t) 
 }); });
 ava_1.default.serial('document processing should not start before `sleepUntil`', function (t) { return __awaiter(_this, void 0, void 0, function () {
     var _this = this;
-    var future, ranInFuture, c;
+    var ranInFuture, future, c;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                future = moment().add(3000, 'millisecond');
                 ranInFuture = false;
+                future = moment().add(3000, 'millisecond');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
                     onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
@@ -312,12 +312,12 @@ ava_1.default.serial('document with `interval` should run repeatedly', function 
 }); });
 ava_1.default.serial('document should stop recurring at `repeatUntil`', function (t) { return __awaiter(_this, void 0, void 0, function () {
     var _this = this;
-    var stop, repeated, c;
+    var repeated, stop, c;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                stop = moment().add(3000, 'millisecond');
                 repeated = 0;
+                stop = moment().add(3000, 'millisecond');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
                     onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
