@@ -5,7 +5,7 @@ import { promise as sleep } from 'es6-sleep';
 import { MongoCron } from '..';
 
 test.beforeEach(async (t) => {
-  t.context.mongo = await MongoClient.connect('mongodb://localhost:27017');
+  t.context.mongo = await MongoClient.connect('mongodb://localhost:27017',{ useNewUrlParser: true });
   t.context.db = t.context.mongo.db('test');
   t.context.collection = t.context.db.collection('jobs');
   try { await t.context.collection.drop(); } catch (e) {}
@@ -22,10 +22,10 @@ test.serial('document with `sleepUntil` should be processed', async (t) => {
     onDocument: () => times++,
   });
   await t.context.collection.insert([
-    { sleepUntil: new Date() },
-    { sleepUntil: new Date() },
-    { sleepUntil: null },
-    { sleepUntil: new Date() },
+    { sleepUntil: new Date() ,timeZone:'Africa/Nairobi'},
+    { sleepUntil: new Date() ,timeZone:'Africa/Nairobi'},
+    { sleepUntil: null ,timeZone:'Africa/Nairobi'},
+    { sleepUntil: new Date(),timeZone:'Africa/Nairobi' },
   ]);
   await c.start();
   await sleep(3000);
@@ -70,14 +70,14 @@ test.serial('cron should trigger the `onIdle` handler only once', async (t) => {
 
 test.serial('locked documents should not be available for locking', async (t) => {
   let processed = false;
-  const future = moment().add(5000, 'millisecond');
+  const future = moment().add(5000, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
     lockDuration: 5000,
     onDocument: () => processed = true,
   });
   await t.context.collection.insert({
-    sleepUntil: future.toDate(),
+    sleepUntil: future.toDate(),timeZone:'Africa/Nairobi'
   });
   await c.start();
   await sleep(500);
@@ -94,10 +94,10 @@ test.serial('condition should filter lockable documents', async (t) => {
   });
   await t.context.collection.insert({
     handle: true,
-    sleepUntil: new Date(),
+    sleepUntil: new Date(),timeZone:'Africa/Nairobi'
   });
   await t.context.collection.insert({
-    sleepUntil: new Date(),
+    sleepUntil: new Date(),timeZone:'Africa/Nairobi'
   });
   await c.start();
   await sleep(4000);
@@ -107,14 +107,14 @@ test.serial('condition should filter lockable documents', async (t) => {
 
 test.serial('document processing should not start before `sleepUntil`', async (t) => {
   let ranInFuture = false;
-  const future = moment().add(3000, 'millisecond');
+  const future = moment().add(3000, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
     onDocument: async (doc) => ranInFuture = moment() >= future,
   });
   await c.start();
   await t.context.collection.insert({
-    sleepUntil: future.toDate(),
+    sleepUntil: future.toDate(),timeZone:'Africa/Nairobi'
   });
   await sleep(4000);
   await c.stop();
@@ -131,6 +131,7 @@ test.serial('document with `interval` should run repeatedly', async (t) => {
   await t.context.collection.insert({
     sleepUntil: new Date(),
     interval: '* * * * * *',
+    timeZone:'Africa/Nairobi'
   });
   await sleep(3000);
   await c.stop();
@@ -139,17 +140,21 @@ test.serial('document with `interval` should run repeatedly', async (t) => {
 
 test.serial('document should stop recurring at `repeatUntil`', async (t) => {
   let repeated = 0;
-  const stop = moment().add(3000, 'millisecond');
+  const stop = moment().add(3000, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
-    onDocument: async (doc) => repeated++,
-    reprocessDelay: 1000,
+    onDocument: async (doc) =>{
+      repeated++
+    },
+    reprocessDelay: 1000
   });
   await c.start();
+  let date=new Date();
   await t.context.collection.insert({
-    sleepUntil: new Date(),
+    sleepUntil: date,
     interval: '* * * * * *',
     repeatUntil: stop.toDate(),
+    timeZone:'Africa/Nairobi'
   });
   await sleep(3000);
   await c.stop();
@@ -164,6 +169,7 @@ test.serial('document with `autoRemove` should be deleted when completed', async
   await t.context.collection.insert({
     sleepUntil: new Date(),
     autoRemove: true,
+    timeZone:'Africa/Nairobi'
   });
   await sleep(2000);
   await c.stop();

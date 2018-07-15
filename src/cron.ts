@@ -1,9 +1,8 @@
-import * as later from 'later';
 import * as dot from 'dot-object';
-import * as moment from 'moment';
+import * as moment from 'moment-timezone';
 import { ObjectId, Collection } from 'mongodb';
 import { promise as sleep } from 'es6-sleep';
-
+import * as parser from 'cron-parser';
 /**
  * Configuration object interface.
  */
@@ -23,6 +22,7 @@ export interface MongoCronCfg {
   intervalFieldPath?: string;
   repeatUntilFieldPath?: string;
   autoRemoveFieldPath?: string;
+  timeZoneFieldPath?: string;
 }
 
 /**
@@ -50,6 +50,7 @@ export class MongoCron {
       intervalFieldPath: 'interval',
       repeatUntilFieldPath: 'repeatUntil',
       autoRemoveFieldPath: 'autoRemove',
+      timeZoneFieldPath: 'timeZone',
       ...config,
     };
   }
@@ -127,6 +128,7 @@ export class MongoCron {
     this.processing = true;
     try {
       const doc = await this.lockNext(); // locking next job
+
       if (!doc) {
         this.processing = false;
         if (!this.idle) {
@@ -137,6 +139,7 @@ export class MongoCron {
         }
         await sleep(this.config.idleDelay);
       } else {
+
         this.idle = false;
         if (this.config.onDocument) {
           await this.config.onDocument.call(this, doc, this);
@@ -155,21 +158,26 @@ export class MongoCron {
    * Locks the next job document for processing and returns it.
    */
   protected async lockNext() {
-    const sleepUntil = moment().add(this.config.lockDuration, 'millisecond').toDate();
+    const sleepUntil = moment().add(this.config.lockDuration, 'milliseconds').toDate();
     const currentDate = moment().toDate();
+    let currentControl=this;
 
     const res = await this.getCollection().findOneAndUpdate({
-      $and: [
-        { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null }},
-        { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
-        this.config.condition,
-      ].filter((c) => !!c)
-    }, {
-      $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
-    }, {
-      returnOriginal: false, // by default, documents are ordered by the sleepUntil field
-    });
+        $and: [
+          { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null }},
+          { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
+          this.config.condition,
+        ].filter((c) => !!c)
+      }, {
+        $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
+      }, {
+        returnOriginal: false, // by default, documents are ordered by the sleepUntil field
+      });
     return res.value;
+
+
+
+
   }
 
   /**
@@ -181,18 +189,41 @@ export class MongoCron {
       return null;
     }
 
-    const start = moment(dot.pick(this.config.sleepUntilFieldPath, doc))
-      .subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
-    const future = moment().add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
-    if (start >= future) { // already in future
+    const start = moment.tz(dot.pick(this.config.sleepUntilFieldPath, doc),dot.pick(this.config.timeZoneFieldPath, doc)).subtract(this.config.lockDuration, 'milliseconds'); // get processing start date (before lock duration was added)
+    const future = moment().tz(dot.pick(this.config.timeZoneFieldPath, doc)).add(this.config.reprocessDelay, 'milliseconds'); // date when the next start is possible
+
+
+    //const start = moment(dot.pick(this.config.sleepUntilFieldPath, doc)).subtract(this.config.lockDuration, 'milliseconds'); // get processing start date (before lock duration was added)
+    //const future = moment().add(this.config.reprocessDelay, 'milliseconds'); // date when the next start is possible
+    // console.log('start')
+    // console.log(start)
+    // console.log(future)
+    if (start>=future) {
       return start.toDate();
     }
 
+
     try { // new date
-      const schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
-      const dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-      const next = dates[1];
-      return next instanceof Date ? next : null;
+
+      let options={
+        currentDate:future.format(),
+        tz:dot.pick(this.config.timeZoneFieldPath, doc)
+      }
+      if(dot.pick(this.config.repeatUntilFieldPath, doc)){
+        options['endDate']=dot.pick(this.config.repeatUntilFieldPath, doc)
+      }
+      const interval = parser.parseExpression(doc[this.config.intervalFieldPath],options)
+
+
+      let nextDate=interval.next();
+      if(!doc[this.config.repeatUntilFieldPath] || moment(nextDate.toDate()).isBefore(doc[this.config.repeatUntilFieldPath])){
+        return nextDate.toDate()
+      }else{
+        return null;
+      }
+
+
+
     } catch (err) {
       return null;
     }
@@ -213,10 +244,13 @@ export class MongoCron {
         $set: { [this.config.sleepUntilFieldPath]: null }
       });
     } else { // reschedule for reprocessing in the future (recurring)
+
       await this.getCollection().updateOne({ _id }, {
         $set: { [this.config.sleepUntilFieldPath]: nextStart }
       });
     }
   }
+
+
 
 }
