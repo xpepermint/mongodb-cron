@@ -22,8 +22,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
         while (_) try {
-            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [0, t.value];
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
                 case 0: case 1: t = op; break;
                 case 4: _.label++; return { value: op[1], done: false };
@@ -43,16 +43,16 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var later = require("later");
 var dot = require("dot-object");
-var moment = require("moment");
+var moment = require("moment-timezone");
 var es6_sleep_1 = require("es6-sleep");
+var parser = require("cron-parser");
 var MongoCron = (function () {
     function MongoCron(config) {
         this.running = false;
         this.processing = false;
         this.idle = false;
-        this.config = __assign({ onDocument: function (doc) { return doc; }, onError: console.error, nextDelay: 0, reprocessDelay: 0, idleDelay: 0, lockDuration: 600000, sleepUntilFieldPath: 'sleepUntil', intervalFieldPath: 'interval', repeatUntilFieldPath: 'repeatUntil', autoRemoveFieldPath: 'autoRemove' }, config);
+        this.config = __assign({ onDocument: function (doc) { return doc; }, onError: console.error, nextDelay: 0, reprocessDelay: 0, idleDelay: 0, lockDuration: 600000, sleepUntilFieldPath: 'sleepUntil', intervalFieldPath: 'interval', repeatUntilFieldPath: 'repeatUntil', autoRemoveFieldPath: 'autoRemove', timeZoneFieldPath: 'timeZone' }, config);
     }
     MongoCron.prototype.getCollection = function () {
         return typeof this.config.collection === 'function'
@@ -112,8 +112,8 @@ var MongoCron = (function () {
     };
     MongoCron.prototype.tick = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
             var doc, err_1;
+            var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -172,12 +172,13 @@ var MongoCron = (function () {
     };
     MongoCron.prototype.lockNext = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var sleepUntil, currentDate, res, _a, _b, _c;
+            var _a, _b, _c, sleepUntil, currentDate, currentControl, res;
             return __generator(this, function (_d) {
                 switch (_d.label) {
                     case 0:
-                        sleepUntil = moment().add(this.config.lockDuration, 'millisecond').toDate();
+                        sleepUntil = moment().add(this.config.lockDuration, 'milliseconds').toDate();
                         currentDate = moment().toDate();
+                        currentControl = this;
                         return [4, this.getCollection().findOneAndUpdate({
                                 $and: [
                                     (_a = {}, _a[this.config.sleepUntilFieldPath] = { $exists: true, $ne: null }, _a),
@@ -200,17 +201,27 @@ var MongoCron = (function () {
         if (!dot.pick(this.config.intervalFieldPath, doc)) {
             return null;
         }
-        var start = moment(dot.pick(this.config.sleepUntilFieldPath, doc))
-            .subtract(this.config.lockDuration, 'millisecond');
-        var future = moment().add(this.config.reprocessDelay, 'millisecond');
+        var start = moment.tz(dot.pick(this.config.sleepUntilFieldPath, doc), dot.pick(this.config.timeZoneFieldPath, doc)).subtract(this.config.lockDuration, 'milliseconds');
+        var future = moment().tz(dot.pick(this.config.timeZoneFieldPath, doc)).add(this.config.reprocessDelay, 'milliseconds');
         if (start >= future) {
             return start.toDate();
         }
         try {
-            var schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
-            var dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-            var next = dates[1];
-            return next instanceof Date ? next : null;
+            var options = {
+                currentDate: future.format(),
+                tz: dot.pick(this.config.timeZoneFieldPath, doc)
+            };
+            if (dot.pick(this.config.repeatUntilFieldPath, doc)) {
+                options['endDate'] = dot.pick(this.config.repeatUntilFieldPath, doc);
+            }
+            var interval = parser.parseExpression(doc[this.config.intervalFieldPath], options);
+            var nextDate = interval.next();
+            if (!doc[this.config.repeatUntilFieldPath] || moment(nextDate.toDate()).isBefore(doc[this.config.repeatUntilFieldPath])) {
+                return nextDate.toDate();
+            }
+            else {
+                return null;
+            }
         }
         catch (err) {
             return null;
@@ -218,7 +229,7 @@ var MongoCron = (function () {
     };
     MongoCron.prototype.reschedule = function (doc) {
         return __awaiter(this, void 0, void 0, function () {
-            var nextStart, _id, _a, _b;
+            var _a, _b, nextStart, _id;
             return __generator(this, function (_c) {
                 switch (_c.label) {
                     case 0:

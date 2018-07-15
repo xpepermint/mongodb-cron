@@ -15,6 +15,7 @@ export interface MongoCronCfg {
     intervalFieldPath?: string;
     repeatUntilFieldPath?: string;
     autoRemoveFieldPath?: string;
+    timeZoneFieldPath?: string;
 }
 export declare class MongoCron {
     protected running: boolean;
@@ -30,6 +31,6 @@ export declare class MongoCron {
     stop(): Promise<void>;
     protected tick(): Promise<void>;
     protected lockNext(): Promise<any>;
-    protected getNextStart(doc: any): Date;
+    protected getNextStart(doc: any): any;
     reschedule(doc: any): Promise<void>;
 }

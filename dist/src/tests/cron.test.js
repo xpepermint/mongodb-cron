@@ -14,8 +14,8 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
         while (_) try {
-            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [0, t.value];
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
                 case 0: case 1: t = op; break;
                 case 4: _.label++; return { value: op[1], done: false };
@@ -47,7 +47,7 @@ ava_1.default.beforeEach(function (t) { return __awaiter(_this, void 0, void 0, 
         switch (_b.label) {
             case 0:
                 _a = t.context;
-                return [4, mongodb_1.MongoClient.connect('mongodb://localhost:27017')];
+                return [4, mongodb_1.MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true })];
             case 1:
                 _a.mongo = _b.sent();
                 t.context.db = t.context.mongo.db('test');
@@ -87,10 +87,10 @@ ava_1.default.serial('document with `sleepUntil` should be processed', function 
                     onDocument: function () { return times++; },
                 });
                 return [4, t.context.collection.insert([
-                        { sleepUntil: new Date() },
-                        { sleepUntil: new Date() },
-                        { sleepUntil: null },
-                        { sleepUntil: new Date() },
+                        { sleepUntil: new Date(), timeZone: 'Africa/Nairobi' },
+                        { sleepUntil: new Date(), timeZone: 'Africa/Nairobi' },
+                        { sleepUntil: null, timeZone: 'Africa/Nairobi' },
+                        { sleepUntil: new Date(), timeZone: 'Africa/Nairobi' },
                     ])];
             case 1:
                 _c.sent();
@@ -113,8 +113,8 @@ ava_1.default.serial('document with `sleepUntil` should be processed', function 
     });
 }); });
 ava_1.default.serial('cron should trigger event methods', function (t) { return __awaiter(_this, void 0, void 0, function () {
-    var _this = this;
     var onStart, onStop, onDocument, c;
+    var _this = this;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -187,14 +187,14 @@ ava_1.default.serial('locked documents should not be available for locking', fun
         switch (_a.label) {
             case 0:
                 processed = false;
-                future = moment().add(5000, 'millisecond');
+                future = moment().add(5000, 'milliseconds');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
                     lockDuration: 5000,
                     onDocument: function () { return processed = true; },
                 });
                 return [4, t.context.collection.insert({
-                        sleepUntil: future.toDate(),
+                        sleepUntil: future.toDate(), timeZone: 'Africa/Nairobi'
                     })];
             case 1:
                 _a.sent();
@@ -225,12 +225,12 @@ ava_1.default.serial('condition should filter lockable documents', function (t) 
                 });
                 return [4, t.context.collection.insert({
                         handle: true,
-                        sleepUntil: new Date(),
+                        sleepUntil: new Date(), timeZone: 'Africa/Nairobi'
                     })];
             case 1:
                 _a.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: new Date(),
+                        sleepUntil: new Date(), timeZone: 'Africa/Nairobi'
                     })];
             case 2:
                 _a.sent();
@@ -249,13 +249,13 @@ ava_1.default.serial('condition should filter lockable documents', function (t) 
     });
 }); });
 ava_1.default.serial('document processing should not start before `sleepUntil`', function (t) { return __awaiter(_this, void 0, void 0, function () {
-    var _this = this;
     var ranInFuture, future, c;
+    var _this = this;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 ranInFuture = false;
-                future = moment().add(3000, 'millisecond');
+                future = moment().add(3000, 'milliseconds');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
                     onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
@@ -266,7 +266,7 @@ ava_1.default.serial('document processing should not start before `sleepUntil`',
             case 1:
                 _a.sent();
                 return [4, t.context.collection.insert({
-                        sleepUntil: future.toDate(),
+                        sleepUntil: future.toDate(), timeZone: 'Africa/Nairobi'
                     })];
             case 2:
                 _a.sent();
@@ -282,8 +282,8 @@ ava_1.default.serial('document processing should not start before `sleepUntil`',
     });
 }); });
 ava_1.default.serial('document with `interval` should run repeatedly', function (t) { return __awaiter(_this, void 0, void 0, function () {
-    var _this = this;
     var repeated, c;
+    var _this = this;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -300,6 +300,7 @@ ava_1.default.serial('document with `interval` should run repeatedly', function 
                 return [4, t.context.collection.insert({
                         sleepUntil: new Date(),
                         interval: '* * * * * *',
+                        timeZone: 'Africa/Nairobi'
                     })];
             case 2:
                 _a.sent();
@@ -315,27 +316,32 @@ ava_1.default.serial('document with `interval` should run repeatedly', function 
     });
 }); });
 ava_1.default.serial('document should stop recurring at `repeatUntil`', function (t) { return __awaiter(_this, void 0, void 0, function () {
+    var repeated, stop, c, date;
     var _this = this;
-    var repeated, stop, c;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
                 repeated = 0;
-                stop = moment().add(3000, 'millisecond');
+                stop = moment().add(3000, 'milliseconds');
                 c = new __1.MongoCron({
                     collection: t.context.collection,
-                    onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
-                        return [2, repeated++];
-                    }); }); },
-                    reprocessDelay: 1000,
+                    onDocument: function (doc) { return __awaiter(_this, void 0, void 0, function () {
+                        return __generator(this, function (_a) {
+                            repeated++;
+                            return [2];
+                        });
+                    }); },
+                    reprocessDelay: 1000
                 });
                 return [4, c.start()];
             case 1:
                 _a.sent();
+                date = new Date();
                 return [4, t.context.collection.insert({
-                        sleepUntil: new Date(),
+                        sleepUntil: date,
                         interval: '* * * * * *',
                         repeatUntil: stop.toDate(),
+                        timeZone: 'Africa/Nairobi'
                     })];
             case 2:
                 _a.sent();
@@ -364,6 +370,7 @@ ava_1.default.serial('document with `autoRemove` should be deleted when complete
                 return [4, t.context.collection.insert({
                         sleepUntil: new Date(),
                         autoRemove: true,
+                        timeZone: 'Africa/Nairobi'
                     })];
             case 2:
                 _c.sent();

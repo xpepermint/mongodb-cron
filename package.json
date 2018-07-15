@@ -49,20 +49,21 @@
     "@types/dot-object": "^1.5.0",
     "@types/later": "^1.2.4",
     "@types/moment": "^2.13.0",
-    "@types/mongodb": "^3.0.13",
-    "@types/node": "^9.6.5",
+    "@types/mongodb": "^3.1.1",
+    "@types/node": "^9.6.23",
     "ava": "^0.25.0",
-    "mongodb": "^3.0.6",
-    "tslint": "^5.9.1",
-    "typescript": "^2.8.1"
+    "mongodb": "^3.1.1",
+    "tslint": "^5.10.0",
+    "typescript": "^2.9.2"
   },
   "peerDependencies": {
     "mongodb": "^3.0.6"
   },
   "dependencies": {
+    "cron-parser": "^2.5.0",
     "dot-object": "^1.7.0",
     "es6-sleep": "^2.0.2",
-    "later": "^1.2.0",
-    "moment": "^2.22.0"
+    "moment": "^2.22.2",
+    "moment-timezone": "^0.5.21"
   }
 }
