@@ -209,7 +209,11 @@ var MongoCron = (function () {
         try {
             var schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
             var dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-            var next = dates[1];
+            dates = dates.filter(function (x) { return +x > Date.now(); });
+            var next = null;
+            if (dates.length !== 0) {
+                next = dates[0];
+            }
             return next instanceof Date ? next : null;
         }
         catch (err) {
