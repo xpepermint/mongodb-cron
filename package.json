@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MongoDB collection as crontab",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -49,20 +49,20 @@
     "@types/dot-object": "^1.5.0",
     "@types/later": "^1.2.4",
     "@types/moment": "^2.13.0",
-    "@types/mongodb": "^3.0.13",
-    "@types/node": "^9.6.5",
+    "@types/mongodb": "^3.1.10",
+    "@types/node": "^10.11.4",
     "ava": "^0.25.0",
-    "mongodb": "^3.0.6",
-    "tslint": "^5.9.1",
-    "typescript": "^2.8.1"
+    "mongodb": "^3.1.6",
+    "tslint": "^5.11.0",
+    "typescript": "^3.1.1"
   },
   "peerDependencies": {
-    "mongodb": "^3.0.6"
+    "mongodb": "^3.0.0"
   },
   "dependencies": {
     "dot-object": "^1.7.0",
     "es6-sleep": "^2.0.2",
     "later": "^1.2.0",
-    "moment": "^2.22.0"
+    "moment": "^2.22.2"
   }
 }

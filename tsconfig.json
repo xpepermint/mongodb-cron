@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es5",
+    "target": "es6",
     "noImplicitAny": false,
     "removeComments": true,
     "sourceMap": true,
     "outDir": "dist",
-    "declaration": true,
-    "lib": ["es2015.promise", "es2015.iterable", "es5"]
+    "declaration": true
   }
 }

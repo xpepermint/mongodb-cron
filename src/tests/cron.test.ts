@@ -5,7 +5,7 @@ import { promise as sleep } from 'es6-sleep';
 import { MongoCron } from '..';
 
 test.beforeEach(async (t) => {
-  t.context.mongo = await MongoClient.connect('mongodb://localhost:27017');
+  t.context.mongo = await MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true });
   t.context.db = t.context.mongo.db('test');
   t.context.collection = t.context.db.collection('jobs');
   try { await t.context.collection.drop(); } catch (e) {}
@@ -21,7 +21,7 @@ test.serial('document with `sleepUntil` should be processed', async (t) => {
     collection: t.context.collection,
     onDocument: () => times++,
   });
-  await t.context.collection.insert([
+  await t.context.collection.insertMany([
     { sleepUntil: new Date() },
     { sleepUntil: new Date() },
     { sleepUntil: null },
@@ -31,7 +31,7 @@ test.serial('document with `sleepUntil` should be processed', async (t) => {
   await sleep(3000);
   await c.stop();
   t.is(times, 3);
-  t.is(await t.context.collection.count({ sleepUntil: { $ne: null }}), 0);
+  t.is(await t.context.collection.countDocuments({ sleepUntil: { $ne: null }}), 0);
 });
 
 test.serial('cron should trigger event methods', async (t) => {
@@ -44,7 +44,7 @@ test.serial('cron should trigger event methods', async (t) => {
     onStop: async () => onStop = true,
     onDocument: async (doc) => onDocument = true,
   });
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: new Date(),
   });
   await c.start();
@@ -76,7 +76,7 @@ test.serial('locked documents should not be available for locking', async (t) =>
     lockDuration: 5000,
     onDocument: () => processed = true,
   });
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: future.toDate(),
   });
   await c.start();
@@ -92,11 +92,11 @@ test.serial('condition should filter lockable documents', async (t) => {
     condition: { handle: true },
     onDocument: () => count++,
   });
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     handle: true,
     sleepUntil: new Date(),
   });
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: new Date(),
   });
   await c.start();
@@ -113,7 +113,7 @@ test.serial('document processing should not start before `sleepUntil`', async (t
     onDocument: async (doc) => ranInFuture = moment() >= future,
   });
   await c.start();
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: future.toDate(),
   });
   await sleep(4000);
@@ -128,7 +128,7 @@ test.serial('document with `interval` should run repeatedly', async (t) => {
     onDocument: async (doc) => repeated++
   });
   await c.start();
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: new Date(),
     interval: '* * * * * *',
   });
@@ -146,7 +146,7 @@ test.serial('document should stop recurring at `repeatUntil`', async (t) => {
     reprocessDelay: 1000,
   });
   await c.start();
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: new Date(),
     interval: '* * * * * *',
     repeatUntil: stop.toDate(),
@@ -161,11 +161,11 @@ test.serial('document with `autoRemove` should be deleted when completed', async
     collection: t.context.collection
   });
   await c.start();
-  await t.context.collection.insert({
+  await t.context.collection.insertOne({
     sleepUntil: new Date(),
     autoRemove: true,
   });
   await sleep(2000);
   await c.stop();
-  t.is(await t.context.collection.count(), 0);
+  t.is(await t.context.collection.countDocuments(), 0);
 });
