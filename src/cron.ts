@@ -191,7 +191,7 @@ export class MongoCron {
     try { // new date
       const schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
       const dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-      const next = dates[1];
+      const next = dates[0];
       return next instanceof Date ? next : null;
     } catch (err) {
       return null;
