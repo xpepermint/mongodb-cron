@@ -4,7 +4,7 @@ import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
 
 (async function() {
-  const mongo = await MongoClient.connect('mongodb://localhost:27017');
+  const mongo = await MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true });
   const db = mongo.db('test');
   const collection = db.collection('jobs');
 
@@ -20,7 +20,7 @@ import * as moment from 'moment';
     lockDuration: 600000,
   });
 
-  await collection.insert([
+  await collection.insertMany([
     { name: 'Job #3',
       sleepUntil: moment().add(3, 'seconds').toDate()
     },
