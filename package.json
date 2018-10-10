@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "MongoDB collection as crontab",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -17,7 +17,7 @@
     "example": "npm run build && node dist/example",
     "lint": "tslint 'src/**/*.ts?(x)'",
     "prepublish": "npm run build",
-    "test": "npm run build && ava",
+    "test": "npm run build && ava --verbose",
     "speedtest": "babel-node ./speedtest"
   },
   "repository": {

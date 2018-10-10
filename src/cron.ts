@@ -181,17 +181,19 @@ export class MongoCron {
       return null;
     }
 
-    const start = moment(dot.pick(this.config.sleepUntilFieldPath, doc))
-      .subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
-    const future = moment().add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
+    const available = moment(dot.pick(this.config.sleepUntilFieldPath, doc)); // first available next date
+    const start = available.subtract(this.config.lockDuration, 'millisecond'); // get processing start date (before lock duration was added)
+    const future = available.add(this.config.reprocessDelay, 'millisecond'); // date when the next start is possible
     if (start >= future) { // already in future
       return start.toDate();
     }
 
     try { // new date
       const schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
-      const dates = later.schedule(schedule).next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc));
-      const next = dates[1];
+      const dates = later.schedule(schedule)
+        .next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc))
+        .filter((d) => d >= future.toDate());
+      const next = dates[0];
       return next instanceof Date ? next : null;
     } catch (err) {
       return null;

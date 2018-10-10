@@ -153,7 +153,7 @@ test.serial('document should stop recurring at `repeatUntil`', async (t) => {
   });
   await sleep(3000);
   await c.stop();
-  t.is(repeated, 2);
+  t.is(repeated, 3);
 });
 
 test.serial('document with `autoRemove` should be deleted when completed', async (t) => {
