@@ -1,9 +1,8 @@
 sudo: false
 language: node_js
 node_js:
-  - "8"
-  - "7"
-  - "6"
+  - 10
+  - 9
 services:
   - mongodb
 addons:
