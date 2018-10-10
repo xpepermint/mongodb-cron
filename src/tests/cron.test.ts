@@ -19,6 +19,7 @@ test.serial('document with `sleepUntil` should be processed', async (t) => {
   let times = 0;
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     onDocument: () => times++,
   });
   await t.context.collection.insertMany([
@@ -40,6 +41,7 @@ test.serial('cron should trigger event methods', async (t) => {
   let onDocument = false;
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     onStart: async () => onStart = true,
     onStop: async () => onStop = true,
     onDocument: async (doc) => onDocument = true,
@@ -60,6 +62,7 @@ test.serial('cron should trigger the `onIdle` handler only once', async (t) => {
   let count = 0;
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     onIdle: () => count++,
   });
   await c.start();
@@ -89,6 +92,7 @@ test.serial('condition should filter lockable documents', async (t) => {
   let count = 0;
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     condition: { handle: true },
     onDocument: () => count++,
   });
@@ -110,6 +114,7 @@ test.serial('document processing should not start before `sleepUntil`', async (t
   const future = moment().add(3000, 'millisecond');
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     onDocument: async (doc) => ranInFuture = moment() >= future,
   });
   await c.start();
@@ -125,23 +130,27 @@ test.serial('document with `interval` should run repeatedly', async (t) => {
   let repeated = 0;
   const c = new MongoCron({
     collection: t.context.collection,
-    onDocument: async (doc) => repeated++
+    lockDuration: 0,
+    onDocument: async (doc) => {
+      repeated++;
+    },
   });
   await c.start();
   await t.context.collection.insertOne({
     sleepUntil: new Date(),
     interval: '* * * * * *',
   });
-  await sleep(3000);
+  await sleep(3100);
   await c.stop();
   t.is(repeated >= 3, true);
 });
 
 test.serial('document should stop recurring at `repeatUntil`', async (t) => {
   let repeated = 0;
-  const stop = moment().add(3000, 'millisecond');
+  const stop = moment().add(2500, 'millisecond');
   const c = new MongoCron({
     collection: t.context.collection,
+    lockDuration: 0,
     onDocument: async (doc) => repeated++,
     reprocessDelay: 1000,
   });
@@ -151,14 +160,15 @@ test.serial('document should stop recurring at `repeatUntil`', async (t) => {
     interval: '* * * * * *',
     repeatUntil: stop.toDate(),
   });
-  await sleep(3000);
+  await sleep(6000);
   await c.stop();
-  t.is(repeated, 3);
+  t.is(repeated, 2);
 });
 
 test.serial('document with `autoRemove` should be deleted when completed', async (t) => {
   const c = new MongoCron({
-    collection: t.context.collection
+    collection: t.context.collection,
+    lockDuration: 0,
   });
   await c.start();
   await t.context.collection.insertOne({
