@@ -73,7 +73,7 @@ test.serial('cron should trigger the `onIdle` handler only once', async (t) => {
 
 test.serial('locked documents should not be available for locking', async (t) => {
   let processed = false;
-  const future = moment().add(5000, 'millisecond');
+  const future = moment().add(5000, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
     lockDuration: 5000,
@@ -111,7 +111,7 @@ test.serial('condition should filter lockable documents', async (t) => {
 
 test.serial('document processing should not start before `sleepUntil`', async (t) => {
   let ranInFuture = false;
-  const future = moment().add(3000, 'millisecond');
+  const future = moment().add(3000, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
     lockDuration: 0,
@@ -146,12 +146,12 @@ test.serial('document with `interval` should run repeatedly', async (t) => {
 });
 
 test.serial('document should stop recurring at `repeatUntil`', async (t) => {
-  let repeated = 0;
-  const stop = moment().add(2500, 'millisecond');
+  let repeated = moment();
+  const stop = moment().add(2500, 'milliseconds');
   const c = new MongoCron({
     collection: t.context.collection,
     lockDuration: 0,
-    onDocument: async (doc) => repeated++,
+    onDocument: async (doc) => repeated = moment(),
     reprocessDelay: 1000,
   });
   await c.start();
@@ -162,7 +162,7 @@ test.serial('document should stop recurring at `repeatUntil`', async (t) => {
   });
   await sleep(6000);
   await c.stop();
-  t.is(repeated, 2);
+  t.is(repeated.isAfter(stop), false);
 });
 
 test.serial('document with `autoRemove` should be deleted when completed', async (t) => {
