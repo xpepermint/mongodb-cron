@@ -1,7 +1,7 @@
 import * as later from 'later';
 import * as dot from 'dot-object';
 import * as moment from 'moment';
-import { ObjectId, Collection } from 'mongodb';
+import { Collection } from 'mongodb';
 import { promise as sleep } from 'es6-sleep';
 
 /**
@@ -136,7 +136,8 @@ export class MongoCron {
           }
         }
         await sleep(this.config.idleDelay);
-      } else {
+      }
+      else {
         this.idle = false;
         if (this.config.onDocument) {
           await this.config.onDocument.call(this, doc, this);
@@ -144,7 +145,8 @@ export class MongoCron {
         await this.reschedule(doc);
         this.processing = false;
       }
-    } catch (err) {
+    }
+    catch (err) {
       await this.config.onError.call(this, err, this);
     }
 
@@ -191,7 +193,8 @@ export class MongoCron {
         .filter((d) => d >= future.toDate());
       const next = dates[0];
       return next instanceof Date ? next : null;
-    } catch (err) {
+    }
+    catch (err) {
       return null;
     }
   }
@@ -206,11 +209,13 @@ export class MongoCron {
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this.getCollection().deleteOne({ _id });
-    } else if (!nextStart) { // stop execution
+    }
+    else if (!nextStart) { // stop execution
       await this.getCollection().updateOne({ _id }, {
         $set: { [this.config.sleepUntilFieldPath]: null }
       });
-    } else { // reschedule for reprocessing in the future (recurring)
+    }
+    else { // reschedule for reprocessing in the future (recurring)
       await this.getCollection().updateOne({ _id }, {
         $set: { [this.config.sleepUntilFieldPath]: nextStart }
       });
