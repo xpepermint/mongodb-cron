@@ -1,4 +1,4 @@
-![Build Status](https://travis-ci.org/xpepermint/mongodb-cron.svg?branch=master)&nbsp;[![NPM Version](https://badge.fury.io/js/mongodb-cron.svg)](https://badge.fury.io/js/mongodb-cron)&nbsp;[![Dependency Status](https://gemnasium.com/xpepermint/mongodb-cron.svg)](https://gemnasium.com/xpepermint/mongodb-cron)
+[![Build Status](https://travis-ci.org/xpepermint/mongodb-cron.svg?branch=master)](https://travis-ci.org/xpepermint/mongodb-cron)&nbsp;[![NPM Version](https://badge.fury.io/js/mongodb-cron.svg)](https://badge.fury.io/js/mongodb-cron)
 
 # [mongodb](https://docs.mongodb.com/ecosystem/drivers/node-js/)-cron
 
