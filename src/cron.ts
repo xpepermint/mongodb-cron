@@ -1,6 +1,6 @@
+import * as parser from 'cron-parser';
 import * as dot from 'dot-object';
 import { promise as sleep } from 'es6-sleep';
-import * as later from 'later';
 import * as moment from 'moment';
 import { Collection } from 'mongodb';
 
@@ -32,7 +32,7 @@ export class MongoCron {
   protected running = false;
   protected processing = false;
   protected idle = false;
-  public readonly config: MongoCronCfg;
+  protected readonly config: MongoCronCfg;
 
   /**
    * Class constructor.
@@ -177,7 +177,7 @@ export class MongoCron {
    * job has expired.
    * @param doc Mongo document.
    */
-  protected getNextStart(doc) {
+  protected getNextStart(doc: any): Date {
     if (!dot.pick(this.config.intervalFieldPath, doc)) { // not recurring job
       return null;
     }
@@ -185,13 +185,12 @@ export class MongoCron {
     const available = moment(dot.pick(this.config.sleepUntilFieldPath, doc)); // first available next date
     const future = moment(available).add(this.config.reprocessDelay, 'milliseconds'); // date when the next start is possible
 
-    try { // new date
-      const schedule = later.parse.cron(dot.pick(this.config.intervalFieldPath, doc), true);
-      const dates = later.schedule(schedule)
-        .next(2, future.toDate(), dot.pick(this.config.repeatUntilFieldPath, doc))
-        .filter((d) => d >= future.toDate());
-      const next = dates[0];
-      return next instanceof Date ? next : null;
+    try {
+      const interval = parser.parseExpression(dot.pick(this.config.intervalFieldPath, doc), {
+        currentDate: future.toDate(),
+        endDate: dot.pick(this.config.repeatUntilFieldPath, doc),
+      });
+      return interval.next().toDate();
     } catch (err) {
       return null;
     }
@@ -202,7 +201,7 @@ export class MongoCron {
    * if `autoRemove` is set to `true`.
    * @param doc Mongo document.
    */
-  public async reschedule(doc) {
+  public async reschedule(doc: any): Promise<void> {
     const nextStart = this.getNextStart(doc);
     const _id = doc._id;
 

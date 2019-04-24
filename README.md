@@ -50,7 +50,7 @@ We can now create our first job.
 
 ```js
 const job = await collection.insert({
-  sleepUntil: new Date('2016-01-01'),
+  sleepUntil: new Date('2016-01-01'), // ISO 8601 format (can include timezone)
 });
 ```
 
@@ -141,21 +141,21 @@ const job = await collection.insert({
 
 | Option | Type | Required | Default | Description
 |--------|------|----------|---------|------------
+| autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
 | collection | Object | Yes | - | MongoDB collection object.
 | condition | Object | No | null | Additional query condition.
+| idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
+| intervalFieldPath | String | No | interval | The `interval` field path.
+| lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
+| nextDelay | Integer | No | 0 | A variable which tells how fast the next job can be processed.
+| onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
+| onError | Function/Promise | No | - | A method which is triggered in case of an error.
+| onIdle | Function/Promise | No | - | A method which is triggered when all jobs in a collection have been processed.
 | onStart | Function/Promise | No | - | A method which is triggered when the cron is started.
 | onStop | Function/Promise | No | - | A method which is triggered when the cron is stopped.
-| onDocument | Function/Promise | No | - | A method which is triggered when a document should be processed.
-| onIdle | Function/Promise | No | - | A method which is triggered when all jobs in a collection have been processed.
-| onError | Function/Promise | No | - | A method which is triggered in case of an error.
-| nextDelay | Integer | No | 0 | A variable which tells how fast the next job can be processed.
-| reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
-| idleDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before checking for new jobs after all jobs has been processed.
-| lockDuration | Integer | No | 600000 | A number of milliseconds for which each job gets locked for (we have to make sure that the job completes in that time frame).
-| sleepUntilFieldPath | String | No | sleepUntil | The `sleepUntil` field path.
-| intervalFieldPath | String | No | interval | The `interval` field path.
 | repeatUntilFieldPath | String | No | repeatUntil | The `repeatUntil` field path.
-| autoRemoveFieldPath | String | No | autoRemove | The `autoRemove` field path.
+| reprocessDelay | Integer | No | 0 | A variable which tells how many milliseconds the worker should wait before processing the same job again in case the job is a recurring job.
+| sleepUntilFieldPath | String | No | sleepUntil | The `sleepUntil` field path.
 
 ```js
 import { MongoClient } from 'mongodb';
