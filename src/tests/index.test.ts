@@ -1,6 +1,10 @@
-import test from 'ava';
-import { MongoCron } from '..';
+import { Spec } from '@hayspec/spec';
+import * as all from '..';
 
-test('exposed content', (t) => {
-  t.is(!!MongoCron, true);
+const spec = new Spec();
+
+spec.test('exposes objects', (ctx) => {
+  ctx.true(!!all.MongoCron);
 });
+
+export default spec;

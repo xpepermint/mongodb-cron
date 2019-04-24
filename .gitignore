@@ -1,4 +1,5 @@
 .DS_Store
 .vscode
+.nyc*
 node_modules
 dist

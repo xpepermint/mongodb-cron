@@ -1,8 +1,8 @@
-import * as later from 'later';
 import * as dot from 'dot-object';
+import { promise as sleep } from 'es6-sleep';
+import * as later from 'later';
 import * as moment from 'moment';
 import { Collection } from 'mongodb';
-import { promise as sleep } from 'es6-sleep';
 
 /**
  * Configuration object interface.
@@ -10,11 +10,6 @@ import { promise as sleep } from 'es6-sleep';
 export interface MongoCronCfg {
   collection: Collection | (() => Collection);
   condition?: any;
-  onDocument?: (doc: any) => (any | Promise<any>);
-  onStart?: (doc: any) => (any | Promise<any>);
-  onStop?: () => (any | Promise<any>);
-  onIdle?: () => (any | Promise<any>);
-  onError?: (err: any) => (any | Promise<any>);
   nextDelay?: number; // wait before processing next job
   reprocessDelay?: number; // wait before processing the same job again
   idleDelay?: number; // when there is no jobs for processing, wait before continue
@@ -23,21 +18,25 @@ export interface MongoCronCfg {
   intervalFieldPath?: string;
   repeatUntilFieldPath?: string;
   autoRemoveFieldPath?: string;
-  useLocalTime?: boolean; // Uses either UTC or local system time to evaluate intervals
+  onDocument?(doc: any): (any | Promise<any>);
+  onStart?(doc: any): (any | Promise<any>);
+  onStop?(): (any | Promise<any>);
+  onIdle?(): (any | Promise<any>);
+  onError?(err: any): (any | Promise<any>);
 }
 
 /**
  * Main class for converting a collection into cron.
  */
 export class MongoCron {
-  protected running: boolean = false;
-  protected processing: boolean = false;
-  protected idle: boolean = false;
-  readonly config: MongoCronCfg;
+  protected running = false;
+  protected processing = false;
+  protected idle = false;
+  public readonly config: MongoCronCfg;
 
   /**
    * Class constructor.
-   * @param {MongoCronCfg} config Configuration object.
+   * @param config Configuration object.
    */
   public constructor(config: MongoCronCfg) {
     this.config = {
@@ -51,14 +50,8 @@ export class MongoCron {
       intervalFieldPath: 'interval',
       repeatUntilFieldPath: 'repeatUntil',
       autoRemoveFieldPath: 'autoRemove',
-      useLocalTime: false,
       ...config,
     };
-    if (this.config.useLocalTime) {
-      later.date.localTime();
-    } else {
-      later.date.UTC();
-    }
   }
 
   /**
@@ -127,9 +120,9 @@ export class MongoCron {
    * Private method which runs the heartbit tick.
    */
   protected async tick() {
-    if (!this.running) return;
+    if (!this.running) { return; }
     await sleep(this.config.nextDelay);
-    if (!this.running) return;
+    if (!this.running) { return; }
 
     this.processing = true;
     try {
@@ -143,8 +136,7 @@ export class MongoCron {
           }
         }
         await sleep(this.config.idleDelay);
-      }
-      else {
+      } else {
         this.idle = false;
         if (this.config.onDocument) {
           await this.config.onDocument.call(this, doc, this);
@@ -152,8 +144,7 @@ export class MongoCron {
         await this.reschedule(doc);
         this.processing = false;
       }
-    }
-    catch (err) {
+    } catch (err) {
       await this.config.onError.call(this, err, this);
     }
 
@@ -172,7 +163,7 @@ export class MongoCron {
         { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null }},
         { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
         this.config.condition,
-      ].filter((c) => !!c)
+      ].filter((c) => !!c),
     }, {
       $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
     }, {
@@ -184,6 +175,7 @@ export class MongoCron {
   /**
    * Returns the next date when a job document can be processed or `null` if the
    * job has expired.
+   * @param doc Mongo document.
    */
   protected getNextStart(doc) {
     if (!dot.pick(this.config.intervalFieldPath, doc)) { // not recurring job
@@ -200,15 +192,15 @@ export class MongoCron {
         .filter((d) => d >= future.toDate());
       const next = dates[0];
       return next instanceof Date ? next : null;
-    }
-    catch (err) {
+    } catch (err) {
       return null;
     }
   }
 
-  /*
+  /**
    * Tries to reschedule a job document, to mark it as expired or to delete a job
    * if `autoRemove` is set to `true`.
+   * @param doc Mongo document.
    */
   public async reschedule(doc) {
     const nextStart = this.getNextStart(doc);
@@ -216,15 +208,13 @@ export class MongoCron {
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this.getCollection().deleteOne({ _id });
-    }
-    else if (!nextStart) { // stop execution
+    } else if (!nextStart) { // stop execution
       await this.getCollection().updateOne({ _id }, {
-        $set: { [this.config.sleepUntilFieldPath]: null }
+        $set: { [this.config.sleepUntilFieldPath]: null },
       });
-    }
-    else { // reschedule for reprocessing in the future (recurring)
+    } else { // reschedule for reprocessing in the future (recurring)
       await this.getCollection().updateOne({ _id }, {
-        $set: { [this.config.sleepUntilFieldPath]: nextStart }
+        $set: { [this.config.sleepUntilFieldPath]: nextStart },
       });
     }
   }

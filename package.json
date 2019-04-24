@@ -4,21 +4,33 @@
   "description": "MongoDB collection as crontab",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
-  "ava": {
-    "files": [
-      "./dist/src/tests/*.test.js"
-    ],
-    "concurrency": 1,
-    "failFast": true
-  },
   "scripts": {
     "clean": "rm -Rf ./dist",
     "build": "npm run clean && tsc",
     "example": "npm run build && node dist/example",
     "lint": "tslint 'src/**/*.ts?(x)'",
     "prepublish": "npm run build",
-    "test": "npm run build && ava --verbose",
+    "test": "npm run lint && npx nyc npx hayspec test",
     "speedtest": "babel-node ./speedtest"
+  },
+  "hayspec": {
+    "require": [
+      "ts-node/register"
+    ],
+    "match": [
+      "./src/tests/**/*.test.ts"
+    ]
+  },
+  "nyc": {
+    "extension": [
+      ".ts"
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "exclude": [
+      "src/tests"
+    ]
   },
   "repository": {
     "type": "git",
@@ -45,24 +57,27 @@
     "url": "https://github.com/xpepermint/mongodb-cron/issues"
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
-  "devDependencies": {
-    "@types/dot-object": "^1.5.0",
-    "@types/later": "^1.2.4",
-    "@types/moment": "^2.13.0",
-    "@types/mongodb": "^3.1.14",
-    "@types/node": "^10.12.6",
-    "ava": "^0.25.0",
-    "mongodb": "^3.1.9",
-    "tslint": "^5.11.0",
-    "typescript": "^3.1.6"
-  },
   "peerDependencies": {
     "mongodb": "^3.0.0"
+  },
+  "devDependencies": {
+    "@hayspec/cli": "^0.8.3",
+    "@hayspec/spec": "^0.8.3",
+    "@types/dot-object": "^1.7.0",
+    "@types/later": "^1.2.5",
+    "@types/moment": "^2.13.0",
+    "@types/mongodb": "^3.1.25",
+    "@types/node": "^11.13.7",
+    "mongodb": "^3.2.3",
+    "nyc": "^14.0.0",
+    "ts-node": "^8.1.0",
+    "tslint": "^5.16.0",
+    "typescript": "^3.4.5"
   },
   "dependencies": {
     "dot-object": "^1.7.1",
     "es6-sleep": "^2.0.2",
     "later": "^1.2.0",
-    "moment": "^2.22.2"
+    "moment": "^2.24.0"
   }
 }
