@@ -1,7 +1,7 @@
-import { MongoClient } from 'mongodb';
-import { MongoCron } from '../src';
 import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
+import { MongoClient } from 'mongodb';
+import { MongoCron } from '../src';
 
 (async function() {
   const mongo = await MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true });
@@ -22,16 +22,16 @@ import * as moment from 'moment';
 
   await collection.insertMany([
     { name: 'Job #3',
-      sleepUntil: moment().add(3, 'seconds').toDate()
+      sleepUntil: moment().add(3, 'seconds').toDate(),
     },
     { name: 'Job #1',
-      sleepUntil: null
+      sleepUntil: null,
     },
     { name: 'Job #2',
-      sleepUntil: moment().add(2, 'seconds').toDate()
+      sleepUntil: moment().add(2, 'seconds').toDate(),
     },
     { name: 'Job #4',
-      sleepUntil: moment().add(8, 'seconds').toDate()
+      sleepUntil: moment().add(8, 'seconds').toDate(),
     },
   ]);
 
