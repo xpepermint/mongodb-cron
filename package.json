@@ -2,16 +2,16 @@
   "name": "mongodb-cron",
   "version": "1.5.0",
   "description": "MongoDB collection as crontab",
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "clean": "rm -Rf ./dist",
-    "build": "npm run clean && tsc",
-    "example": "npm run build && node dist/example",
-    "lint": "tslint 'src/**/*.ts?(x)'",
+    "build": "npm run clean && npx tsc",
+    "example": "npm run build && npx ts-node ./src/scripts/example.ts",
+    "lint": "npx tslint 'src/**/*.ts?(x)'",
     "prepublish": "npm run build",
     "test": "npm run lint && npx nyc npx hayspec test",
-    "speedtest": "babel-node ./speedtest"
+    "speedtest": "npx ts-node ./src/scripts/speedtest.ts"
   },
   "hayspec": {
     "require": [

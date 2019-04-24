@@ -1,7 +1,7 @@
 import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
 import { MongoClient } from 'mongodb';
-import { MongoCron } from '../src';
+import { MongoCron } from '..';
 
 (async function() {
   const mongo = await MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true });
