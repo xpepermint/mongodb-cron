@@ -23,6 +23,7 @@ export interface MongoCronCfg {
   intervalFieldPath?: string;
   repeatUntilFieldPath?: string;
   autoRemoveFieldPath?: string;
+  useLocalTime?: boolean; // Uses either UTC or local system time to evaluate intervals
 }
 
 /**
@@ -50,8 +51,14 @@ export class MongoCron {
       intervalFieldPath: 'interval',
       repeatUntilFieldPath: 'repeatUntil',
       autoRemoveFieldPath: 'autoRemove',
+      useLocalTime: false,
       ...config,
     };
+    if (this.config.useLocalTime) {
+      later.date.localTime();
+    } else {
+      later.date.UTC();
+    }
   }
 
   /**
