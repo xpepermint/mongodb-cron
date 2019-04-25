@@ -18,11 +18,24 @@ export interface MongoCronCfg {
   intervalFieldPath?: string;
   repeatUntilFieldPath?: string;
   autoRemoveFieldPath?: string;
+  timezone?: string;
   onDocument?(doc: any): (any | Promise<any>);
   onStart?(doc: any): (any | Promise<any>);
   onStop?(): (any | Promise<any>);
   onIdle?(): (any | Promise<any>);
   onError?(err: any): (any | Promise<any>);
+}
+
+/**
+ * Copy of the ParserOptions interface from cron-parser.
+ */
+interface ParserOptions {
+  currentDate?: string | number | Date;
+  startDate?: string | number | Date;
+  endDate?: string | number | Date;
+  iterator?: boolean;
+  utc?: boolean;
+  tz?: string;
 }
 
 /**
@@ -33,6 +46,7 @@ export class MongoCron {
   protected processing = false;
   protected idle = false;
   protected readonly config: MongoCronCfg;
+  protected readonly parserOptions: ParserOptions;
 
   /**
    * Class constructor.
@@ -52,6 +66,16 @@ export class MongoCron {
       autoRemoveFieldPath: 'autoRemove',
       ...config,
     };
+    if (!this.config.timezone) {
+      this.parserOptions = {
+        utc: true,
+      };
+    } else {
+      this.parserOptions = {
+        utc: false,
+        tz: this.config.timezone,
+      };
+    }
   }
 
   /**
@@ -187,6 +211,7 @@ export class MongoCron {
 
     try {
       const interval = parser.parseExpression(dot.pick(this.config.intervalFieldPath, doc), {
+        ...this.parserOptions,
         currentDate: future.toDate(),
         endDate: dot.pick(this.config.repeatUntilFieldPath, doc),
       });
