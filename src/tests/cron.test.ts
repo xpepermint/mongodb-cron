@@ -128,6 +128,24 @@ spec.test('recurring documents should be unlocked when prossed', async (ctx) => 
   ctx.is(processed, 3);
 });
 
+spec.test('recurring documents should process from current date', async (ctx) => {
+  let processed = 0;
+  const past = moment().subtract(10, 'days');
+  const collection = ctx.get('collection');
+  const cron = new MongoCron({
+    collection,
+    onDocument: () => processed++,
+  });
+  await collection.insertOne({
+    sleepUntil: past.toDate(), // should be treated as now() date
+    interval: '* * * * * *',
+  });
+  await cron.start();
+  await sleep(2000);
+  await cron.stop();
+  ctx.true(processed <= 4);
+});
+
 spec.test('condition should filter lockable documents', async (ctx) => {
   let count = 0;
   const collection = ctx.get('collection');
