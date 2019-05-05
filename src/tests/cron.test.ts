@@ -106,6 +106,28 @@ spec.test('locked documents should not be available for locking', async (ctx) =>
   ctx.is(processed, false);
 });
 
+spec.test('recurring documents should be unlocked when prossed', async (ctx) => {
+  let processed = 0;
+  const now = moment();
+  const collection = ctx.get('collection');
+  const cron = new MongoCron({
+    collection,
+    lockDuration: 60000,
+    onDocument: () => {
+      processed++;
+      return sleep(2000);
+    },
+  });
+  await collection.insertOne({
+    sleepUntil: now.toDate(),
+    interval: '* * * * * *',
+  });
+  await cron.start();
+  await sleep(6000);
+  await cron.stop();
+  ctx.is(processed, 3);
+});
+
 spec.test('condition should filter lockable documents', async (ctx) => {
   let count = 0;
   const collection = ctx.get('collection');

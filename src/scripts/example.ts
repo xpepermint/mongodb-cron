@@ -39,4 +39,6 @@ import { MongoCron } from '..';
   await sleep(30000);
   cron.stop();
 
+  process.exit(0);
+
 })().catch(console.error);
