@@ -75,7 +75,7 @@
   },
   "dependencies": {
     "cron-parser": "^2.11.0",
-    "dot-object": "^1.7.1",
+    "dot-object": "^1.9.0",
     "es6-sleep": "^2.0.2",
     "moment": "^2.24.0"
   }
