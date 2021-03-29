@@ -61,7 +61,7 @@
     "mongodb": "^3.0.0"
   },
   "devDependencies": {
-    "@hayspec/cli": "^0.8.3",
+    "@hayspec/cli": "^0.10.0",
     "@hayspec/spec": "^0.8.3",
     "@types/dot-object": "^1.7.0",
     "@types/moment": "^2.13.0",
@@ -75,7 +75,7 @@
   },
   "dependencies": {
     "cron-parser": "^2.11.0",
-    "dot-object": "^1.7.1",
+    "dot-object": "^1.9.0",
     "es6-sleep": "^2.0.2",
     "moment": "^2.24.0"
   }
