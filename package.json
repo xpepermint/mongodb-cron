@@ -61,7 +61,7 @@
     "mongodb": "^3.0.0"
   },
   "devDependencies": {
-    "@hayspec/cli": "^0.8.3",
+    "@hayspec/cli": "^0.10.0",
     "@hayspec/spec": "^0.8.3",
     "@types/dot-object": "^1.7.0",
     "@types/moment": "^2.13.0",
