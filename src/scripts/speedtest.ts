@@ -37,7 +37,7 @@ async function testOneTimeJobs(mongo) {
       onIdle: () => {
         cron.stop().then(() => {
           console.log(`> Done (${Date.now() - time}ms)`);
-          resolve();
+          resolve(null);
         });
       },
       nextDelay: 0,
