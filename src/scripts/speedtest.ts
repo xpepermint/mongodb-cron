@@ -54,7 +54,7 @@ async function testOneTimeJobs(mongo) {
  */
 
 (async function() {
-  const mongo = await MongoClient.connect('mongodb://localhost:27017/test', { useNewUrlParser: true });
+  const mongo = await MongoClient.connect('mongodb://localhost:27017/test');
   await testOneTimeJobs(mongo.db('test'));
   await mongo.close();
 })().catch(console.error);

@@ -58,15 +58,14 @@
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "peerDependencies": {
-    "mongodb": "^3.6.5"
+    "mongodb": "^4.4.1"
   },
   "devDependencies": {
     "@hayspec/cli": "0.10.0",
     "@hayspec/spec": "0.10.0",
     "@types/dot-object": "2.1.2",
-    "@types/mongodb": "3.6.10",
     "@types/node": "14.14.37",
-    "mongodb": "3.6.5",
+    "mongodb": "4.4.1",
     "nyc": "15.1.0",
     "ts-node": "9.1.1",
     "tslint": "6.1.3",
