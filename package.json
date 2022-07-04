@@ -75,6 +75,6 @@
     "cron-parser": "3.3.0",
     "dot-object": "2.1.4",
     "es6-sleep": "2.0.2",
-    "moment": "2.29.1"
+    "moment": "2.29.2"
   }
 }
