@@ -4,7 +4,7 @@ import { MongoClient } from 'mongodb';
 import { MongoCron } from '..';
 
 (async function() {
-  const mongo = await MongoClient.connect('mongodb://localhost:27017', { useNewUrlParser: true });
+  const mongo = await MongoClient.connect('mongodb://localhost:27017');
   const db = mongo.db('test');
   const collection = db.collection('jobs');
 
