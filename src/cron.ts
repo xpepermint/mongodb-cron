@@ -138,21 +138,17 @@ export class MongoCron<T = MongoCronJob> {
     const sleepUntil = moment().add(this.config.lockDuration, 'milliseconds').toDate();
     const currentDate = moment().toDate();
 
-    const res = await this.getCollection().findOneAndUpdate(
-      {
-        $and: [
-          { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null } },
-          { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
-          this.config.condition,
-        ].filter((c) => !!c),
-      },
-      {
-        $set: { [this.config.sleepUntilFieldPath]: sleepUntil } as any,
-      },
-      {
-        returnDocument: 'before', // return original document to calculate next start based on the original value
-      },
-    );
+    const res = await this.getCollection().findOneAndUpdate({
+      $and: [
+        { [this.config.sleepUntilFieldPath]: { $exists: true, $ne: null }},
+        { [this.config.sleepUntilFieldPath]: { $not: { $gt: currentDate } } },
+        this.config.condition,
+      ].filter((c) => !!c),
+    }, {
+      $set: { [this.config.sleepUntilFieldPath]: sleepUntil } as any,
+    }, {
+      returnDocument: 'before', // return original document to calculate next start based on the original value
+    });
     return res.value;
   }
 
@@ -193,22 +189,14 @@ export class MongoCron<T = MongoCronJob> {
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this.getCollection().deleteOne({ _id });
-    } else if (!nextStart) {
-      // stop execution
-      await this.getCollection().updateOne(
-        { _id },
-        {
-          $set: { [this.config.sleepUntilFieldPath]: null } as any,
-        },
-      );
-    } else {
-      // reschedule for reprocessing in the future (recurring)
-      await this.getCollection().updateOne(
-        { _id },
-        {
-          $set: { [this.config.sleepUntilFieldPath]: nextStart } as any,
-        },
-      );
+    } else if (!nextStart) { // stop execution
+      await this.getCollection().updateOne({ _id }, {
+        $set: { [this.config.sleepUntilFieldPath]: null } as any,
+      });
+    } else { // reschedule for reprocessing in the future (recurring)
+      await this.getCollection().updateOne({ _id }, {
+        $set: { [this.config.sleepUntilFieldPath]: nextStart } as any,
+      });
     }
   }
 }
