@@ -2,7 +2,7 @@ import * as parser from 'cron-parser';
 import * as dot from 'dot-object';
 import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
-import { Collection } from 'mongodb';
+import { Collection, WithId } from 'mongodb';
 import { MongoCronCfg, MongoCronJob } from './types';
 
 /**
@@ -157,7 +157,7 @@ export class MongoCron<T = MongoCronJob> {
    * job has expired.
    * @param doc Mongo document.
    */
-  protected getNextStart(doc: any): Date {
+  protected getNextStart(doc: WithId<T>): Date {
     if (!dot.pick(this.config.intervalFieldPath, doc)) { // not recurring job
       return null;
     }
@@ -183,9 +183,9 @@ export class MongoCron<T = MongoCronJob> {
    * if `autoRemove` is set to `true`.
    * @param doc Mongo document.
    */
-  public async reschedule(doc: any): Promise<void> {
+  public async reschedule(doc: WithId<T>): Promise<void> {
     const nextStart = this.getNextStart(doc);
-    const _id = doc._id;
+    const _id = (doc as any)._id;
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this.getCollection().deleteOne({ _id });
