@@ -7,7 +7,7 @@ import { MongoCron, MongoCronJob } from '..';
 const spec = new Spec<{
   db: Db;
   mongo: MongoClient;
-  collection: Collection<MongoCronJob & { handle?: true }>;
+  collection: Collection<MongoCronJob & { handle?: boolean }>;
 }>();
 
 spec.before(async (stage) => {
