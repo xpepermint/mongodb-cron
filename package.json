@@ -1,6 +1,6 @@
 {
   "name": "mongodb-cron",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "MongoDB collection as crontab",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -58,14 +58,14 @@
   },
   "homepage": "https://github.com/xpepermint/mongodb-cron#readme",
   "peerDependencies": {
-    "mongodb": "^4.4.1"
+    "mongodb": "^6.1.0"
   },
   "devDependencies": {
     "@hayspec/cli": "0.10.2",
     "@hayspec/spec": "0.10.2",
     "@types/dot-object": "2.1.2",
     "@types/node": "18.0.1",
-    "mongodb": "4.7.0",
+    "mongodb": "6.1.0",
     "nyc": "15.1.0",
     "ts-node": "10.8.2",
     "tslint": "6.1.3",
