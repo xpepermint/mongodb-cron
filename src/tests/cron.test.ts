@@ -11,7 +11,7 @@ const spec = new Spec<{
 }>();
 
 spec.before(async (stage) => {
-  const mongo = await MongoClient.connect('mongodb://pallyy:secret@localhost:27017');
+  const mongo = await MongoClient.connect('mongodb://localhost:27017');
   const db = mongo.db('test');
   const collection = db.collection('jobs');
   stage.set('mongo', mongo);
