@@ -2,43 +2,23 @@ import * as parser from 'cron-parser';
 import * as dot from 'dot-object';
 import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
-import { Collection } from 'mongodb';
-
-/**
- * Configuration object interface.
- */
-export interface MongoCronCfg {
-  collection: Collection | (() => Collection);
-  condition?: any;
-  nextDelay?: number; // wait before processing next job
-  reprocessDelay?: number; // wait before processing the same job again
-  idleDelay?: number; // when there is no jobs for processing, wait before continue
-  lockDuration?: number; // the time of milliseconds that each job gets locked (we have to make sure that the job completes in that time frame)
-  sleepUntilFieldPath?: string;
-  intervalFieldPath?: string;
-  repeatUntilFieldPath?: string;
-  autoRemoveFieldPath?: string;
-  onDocument?(doc: any): (any | Promise<any>);
-  onStart?(doc: any): (any | Promise<any>);
-  onStop?(): (any | Promise<any>);
-  onIdle?(): (any | Promise<any>);
-  onError?(err: any): (any | Promise<any>);
-}
+import { Collection, WithId } from 'mongodb';
+import { MongoCronCfg, MongoCronJob } from './types';
 
 /**
  * Main class for converting a collection into cron.
  */
-export class MongoCron {
+export class MongoCron<T = MongoCronJob> {
   protected running = false;
   protected processing = false;
   protected idle = false;
-  protected readonly config: MongoCronCfg;
+  protected readonly config: MongoCronCfg<T>;
 
   /**
    * Class constructor.
    * @param config Configuration object.
    */
-  public constructor(config: MongoCronCfg) {
+  public constructor(config: MongoCronCfg<T>) {
     this.config = {
       onDocument: (doc) => doc,
       onError: console.error,
@@ -46,10 +26,10 @@ export class MongoCron {
       reprocessDelay: 0,
       idleDelay: 0,
       lockDuration: 600000,
-      sleepUntilFieldPath: 'sleepUntil',
-      intervalFieldPath: 'interval',
-      repeatUntilFieldPath: 'repeatUntil',
-      autoRemoveFieldPath: 'autoRemove',
+      sleepUntilFieldPath: 'sleepUntil' as string & keyof T,
+      intervalFieldPath: 'interval' as string & keyof T,
+      repeatUntilFieldPath: 'repeatUntil' as string & keyof T,
+      autoRemoveFieldPath: 'autoRemove' as string & keyof T,
       ...config,
     };
   }
@@ -58,7 +38,7 @@ export class MongoCron {
    * Returns the collection instance (the collection can be provided in
    * the config as an instance or a function).
    */
-  protected getCollection(): Collection {
+  protected getCollection(): Collection<T> {
     return typeof this.config.collection === 'function'
       ? this.config.collection()
       : this.config.collection;
@@ -165,7 +145,7 @@ export class MongoCron {
         this.config.condition,
       ].filter((c) => !!c),
     }, {
-      $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
+      $set: { [this.config.sleepUntilFieldPath]: sleepUntil } as any,
     }, {
       returnDocument: 'before', // return original document to calculate next start based on the original value
       includeResultMetadata: true,
@@ -178,7 +158,7 @@ export class MongoCron {
    * job has expired.
    * @param doc Mongo document.
    */
-  protected getNextStart(doc: any): Date {
+  protected getNextStart(doc: WithId<T>): Date {
     if (!dot.pick(this.config.intervalFieldPath, doc)) { // not recurring job
       return null;
     }
@@ -204,21 +184,20 @@ export class MongoCron {
    * if `autoRemove` is set to `true`.
    * @param doc Mongo document.
    */
-  public async reschedule(doc: any): Promise<void> {
+  public async reschedule(doc: WithId<T>): Promise<void> {
     const nextStart = this.getNextStart(doc);
-    const _id = doc._id;
+    const _id = (doc as any)._id;
 
     if (!nextStart && dot.pick(this.config.autoRemoveFieldPath, doc)) { // remove if auto-removable and not recuring
       await this.getCollection().deleteOne({ _id });
     } else if (!nextStart) { // stop execution
       await this.getCollection().updateOne({ _id }, {
-        $set: { [this.config.sleepUntilFieldPath]: null },
+        $set: { [this.config.sleepUntilFieldPath]: null } as any,
       });
     } else { // reschedule for reprocessing in the future (recurring)
       await this.getCollection().updateOne({ _id }, {
-        $set: { [this.config.sleepUntilFieldPath]: nextStart },
+        $set: { [this.config.sleepUntilFieldPath]: nextStart } as any,
       });
     }
   }
-
 }

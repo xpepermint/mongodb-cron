@@ -2,12 +2,12 @@ import { Spec } from '@hayspec/spec';
 import { promise as sleep } from 'es6-sleep';
 import * as moment from 'moment';
 import { Collection, Db, MongoClient } from 'mongodb';
-import { MongoCron } from '..';
+import { MongoCron, MongoCronJob } from '..';
 
 const spec = new Spec<{
   db: Db;
   mongo: MongoClient;
-  collection: Collection;
+  collection: Collection<MongoCronJob & { handle?: boolean }>;
 }>();
 
 spec.before(async (stage) => {
@@ -213,7 +213,7 @@ spec.test('document should stop recurring at `repeatUntil`', async (ctx) => {
   const cron = new MongoCron({
     collection,
     lockDuration: 0,
-    onDocument: async (doc) => repeated = moment(),
+    onDocument: async (doc) => (repeated = moment()),
     reprocessDelay: 1000,
   });
   await cron.start();
