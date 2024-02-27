@@ -168,6 +168,7 @@ export class MongoCron {
       $set: { [this.config.sleepUntilFieldPath]: sleepUntil },
     }, {
       returnDocument: 'before', // return original document to calculate next start based on the original value
+      includeResultMetadata: true,
     });
     return res.value;
   }
